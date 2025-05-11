@@ -1,27 +1,37 @@
 # HA-BT-Advanced: BLE iBeacon Triangulation with ESPHome
 
-This project implements a system for tracking Bluetooth Low Energy (BLE) beacons using multiple ESPHome-based ESP32 devices as proxies. It performs triangulation to estimate beacon positions, which are then displayed on a Home Assistant map.
+This project implements a system for tracking Bluetooth Low Energy (BLE) beacons using multiple ESPHome-based ESP32 devices as proxies. It performs triangulation to estimate beacon positions and displays them on your Home Assistant map - all through an easy-to-use graphical interface with automatic discovery.
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
 
-## Features
+## Key Features
 
+- 🧙‍♂️ **Complete GUI Setup** - No YAML editing required! Everything configurable in the UI
+- 🔍 **Auto-Discovery** - Automatically detects and adds new beacons as they appear
 - 📡 Multiple ESP32 devices with ESPHome firmware act as BLE scanning proxies
 - 🔄 MQTT messaging for BLE scan data
-- 📐 Custom triangulation service using Python
-- 🗺️ Home Assistant integration via MQTT auto-discovery
-- ⚙️ Tunable signal propagation model
-- 🔄 Position smoothing and accuracy estimation
-- 🧙 Complete Home Assistant integration with configuration UI
+- 📐 Custom triangulation service with tunable path-loss model
+- 🗺️ Home Assistant map integration with accuracy circles
+- 📱 Track any BLE iBeacon device (tags, smartphones, wearables)
+
+## Quick Setup Wizard
+
+The integration features a step-by-step setup wizard that handles all configuration:
+
+1. **Base setup** - Configure signal parameters with suggested defaults
+2. **Proxy configuration** - Add proxies visually on a map
+3. **Beacon auto-discovery** - Beacons are automatically detected and named
+
+**No YAML editing required!** The integration provides a complete graphical interface for all configuration.
 
 ## System Architecture
 
-1. **ESPHome Proxies**: ESP32 devices running custom ESPHome firmware scan for BLE advertisements from iBeacons
-2. **MQTT Bridge**: BLE data is published to MQTT topics
-3. **Triangulation Service**: Python service subscribes to MQTT, performs triangulation, and publishes location data
-4. **Home Assistant**: Displays beacon locations on a map with accuracy circles
+1. **ESPHome Proxies**: ESP32 devices running custom ESPHome firmware scan for iBeacon advertisements
+2. **MQTT Bridge**: BLE data is published through MQTT
+3. **Triangulation Service**: Built directly into Home Assistant, performs triangulation calculations
+4. **Home Assistant Integration**: Visual management of proxies and beacons through a fully graphical interface
 
-## Installation Options
+## Installation
 
 ### Option 1: HACS Installation (Recommended)
 
@@ -36,134 +46,75 @@ This project implements a system for tracking Bluetooth Low Energy (BLE) beacons
 9. Go to **Settings** → **Devices & Services** → **Add Integration** and search for "HA-BT-Advanced"
 10. Follow the setup wizard to configure the integration
 
-### Option 2: Home Assistant Manual Integration 
+### Option 2: Manual Installation 
 
 1. Copy the `custom_components/ha_bt_advanced` directory to your Home Assistant `config/custom_components/` directory
 2. Restart Home Assistant
 3. Go to **Settings** → **Devices & Services** → **Add Integration** and search for "HA-BT-Advanced"
 4. Follow the setup wizard to configure the integration
 
-### Option 3: Standalone Installation
+## The Configuration Wizard
 
-#### 1. ESPHome Proxy Setup
+After installation, the integration provides a step-by-step configuration wizard:
 
-1. Flash multiple ESP32 devices with the provided ESPHome configuration
-2. For each device, modify the `proxy_id` in `substitutions` and deploy
+### Step 1: Basic Configuration
 
-```yaml
-# Example for kitchen_proxy
-substitutions:
-  proxy_id: kitchen_proxy  # Change for each ESP32
-  name: "${proxy_id}"
-  friendly_name: "${proxy_id} BLE Proxy"
-```
+![Configuration Screenshot](https://github.com/piwi3910/HA-BT-advanced/raw/main/images/config_screen.png)
 
-3. Make sure to set up your Wi-Fi and MQTT credentials using ESPHome secrets
+- Set signal parameters (with reasonable defaults)
+- Configure MQTT topic prefixes
+- Enable/disable the built-in triangulation service
 
-#### 2. Configure Proxy Positions
+### Step 2: Proxy Configuration
 
-Edit `triangulation_service/proxies.yaml` to set the real-world locations of your proxies:
+Navigate to "HA-BT-Advanced" in the Configuration panel to:
 
-```yaml
-proxies:
-  kitchen_proxy:
-    latitude: 25.1201
-    longitude: 55.3089
-  bedroom_proxy:
-    latitude: 25.1203
-    longitude: 55.3091
-```
+- Add proxies visually using a map interface
+- Enter proxy locations by dragging pins on the map
+- Generate and download ESP32 firmware files directly from the UI
 
-Also configure your beacons in the same file:
+### Step 3: Beacon Management
 
-```yaml
-beacons:
-  "C7:9B:6A:32:BB:0E": "Jayden's Backpack"
-```
+Beacons are automatically discovered when they come into range of your proxies. From the UI you can:
 
-#### 3. Run the Triangulation Service
+- Rename detected beacons with friendly names
+- Monitor signal strength and estimated distance
+- View all beacons on the Home Assistant map
+- Add beacons manually if needed
 
-**Using Docker (recommended):**
+## Home Assistant Entities
 
-```bash
-# Set your MQTT details
-export MQTT_HOST=your-mqtt-host
-export MQTT_USERNAME=your-username
-export MQTT_PASSWORD=your-password
+For each beacon, the integration automatically creates:
 
-# Start the service
-docker-compose up -d
-```
-
-**Manual Installation:**
-
-```bash
-cd triangulation_service
-pip install -r requirements.txt
-python main.py
-```
-
-## Home Assistant Integration Features
-
-The Home Assistant integration provides a complete UI for managing the triangulation system:
-
-### Configuration Options
-
-- TX Power at 1 meter (calibration parameter)
-- Path Loss Exponent (environmental parameter)
-- RSSI and Position Smoothing factors
-- Minimum proxies required for triangulation
-
-### Proxy Management
-
-- Visual map-based interface for adding proxy locations
-- Easy management of proxy devices
-- Automatic ESPHome configuration generation
-
-### Beacon Management
-
-- Automatic beacon discovery when detected
-- Custom naming of beacons
-- Beacon presence detection
-
-### Entities Created
-
-For each beacon, the integration creates:
-
-- Device tracker (for map display)
-- Signal strength sensor
-- Distance sensor
-- Presence binary sensor
+- **Device Tracker Entity**: Shows the beacon location on your map
+- **Signal Strength Sensor**: Tracks RSSI values from each proxy
+- **Distance Sensor**: Shows estimated distance in meters
+- **Presence Binary Sensor**: Detects if the beacon is currently present
 
 ## Signal Propagation Tuning
 
-The relationship between RSSI and distance is affected by environmental factors. You can tune the model by adjusting these parameters in the integration settings:
+The relationship between RSSI and distance is affected by environmental factors. The UI allows you to tune:
 
 - **TX Power**: Measured power at 1 meter (typical values between -59 and -75)
 - **Path Loss Exponent**: 2.0 for free space, 2.7-3.5 for indoor environments
-
-## Technical Details
-
-### MQTT Topics
-
-- BLE advertisements: `ble-triangulation/<proxy_id>`
-- Beacon locations: `ble-location/beacon_<mac>`
-- Discovery topics: `homeassistant/device_tracker/beacon_<mac>/config`
-
-### Triangulation Algorithm
-
-The service uses a weighted trilateration algorithm:
-
-1. RSSI values are converted to estimated distances using the path loss model
-2. For multiple proxies, their distance measurements create circles
-3. The most likely position is calculated from circle intersections
-4. Accuracy is estimated based on the residuals of the solution
+- **RSSI Smoothing**: Reduces signal fluctuations 
+- **Position Smoothing**: Creates smoother movement paths
 
 ## Troubleshooting
 
 - **No beacons detected**: Ensure your iBeacons are active and within range of at least two proxies
-- **Poor accuracy**: Try adjusting the `tx_power` and `path_loss_exponent` values
+- **Poor accuracy**: Adjust the `tx_power` and `path_loss_exponent` values in the integration settings
 - **Erratic movement**: Increase smoothing factors in the configuration settings
+
+## Advanced: Standalone Mode
+
+For advanced users who prefer manual configuration, the repository also includes:
+
+- `esphome_ble_proxy.yaml`: Base ESPHome configuration for proxies
+- `triangulation_service/`: Standalone Python triangulation service
+- `docker-compose.yml`: Docker configuration for standalone deployment
+
+See the [Advanced Configuration](https://github.com/piwi3910/HA-BT-advanced/wiki) page in the wiki for details.
 
 ## Future Enhancements
 
