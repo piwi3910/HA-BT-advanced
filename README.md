@@ -171,3 +171,7 @@ The service uses a weighted trilateration algorithm:
 - Floorplan integration
 - Room-level zoning
 - 3D positioning with altitude
+
+## Author
+
+Pascal Watteel (pascal@watteel.com)
