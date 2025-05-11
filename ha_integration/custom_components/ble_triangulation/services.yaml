@@ -1,0 +1,34 @@
+restart:
+  name: Restart
+  description: Restart the BLE Triangulation service.
+
+add_beacon:
+  name: Add Beacon
+  description: Add a new BLE beacon to track.
+  fields:
+    mac_address:
+      name: MAC Address
+      description: The MAC address of the BLE beacon.
+      required: true
+      example: "C7:9B:6A:32:BB:0E"
+      selector:
+        text:
+    name:
+      name: Name
+      description: The friendly name of the beacon.
+      required: true
+      example: "Jayden's Backpack"
+      selector:
+        text:
+
+remove_beacon:
+  name: Remove Beacon
+  description: Remove a BLE beacon from tracking.
+  fields:
+    mac_address:
+      name: MAC Address
+      description: The MAC address of the BLE beacon to remove.
+      required: true
+      example: "C7:9B:6A:32:BB:0E"
+      selector:
+        text:

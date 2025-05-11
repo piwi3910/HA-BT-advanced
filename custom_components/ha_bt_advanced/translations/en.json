@@ -1,0 +1,85 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "HA-BT-Advanced Setup",
+        "description": "Set up Bluetooth iBeacon Triangulation with ESPHome Proxies",
+        "data": {
+          "tx_power": "TX Power at 1m (dBm)",
+          "path_loss_exponent": "Path Loss Exponent",
+          "rssi_smoothing": "RSSI Smoothing Factor (0-1)",
+          "position_smoothing": "Position Smoothing Factor (0-1)",
+          "max_reading_age": "Max Reading Age (seconds)",
+          "min_proxies": "Minimum Proxies for Triangulation",
+          "mqtt_topic": "MQTT Topic Prefix"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "HA-BT-Advanced is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HA-BT-Advanced Options",
+        "description": "Configure BLE Triangulation Parameters",
+        "data": {
+          "service_enabled": "Enable Triangulation Service",
+          "tx_power": "TX Power at 1m (dBm)",
+          "path_loss_exponent": "Path Loss Exponent",
+          "rssi_smoothing": "RSSI Smoothing Factor (0-1)",
+          "position_smoothing": "Position Smoothing Factor (0-1)",
+          "max_reading_age": "Max Reading Age (seconds)",
+          "min_proxies": "Minimum Proxies for Triangulation",
+          "mqtt_topic": "MQTT Topic Prefix"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "signal_strength": {
+        "name": "Signal Strength"
+      },
+      "beacon_distance": {
+        "name": "Estimated Distance"
+      }
+    },
+    "binary_sensor": {
+      "beacon_detected": {
+        "name": "Beacon Detected"
+      }
+    }
+  },
+  "services": {
+    "restart": {
+      "name": "Restart",
+      "description": "Restart the BLE Triangulation service."
+    },
+    "add_beacon": {
+      "name": "Add Beacon",
+      "description": "Add a new BLE beacon.",
+      "fields": {
+        "mac_address": {
+          "name": "MAC Address",
+          "description": "The MAC address of the BLE beacon."
+        },
+        "name": {
+          "name": "Name",
+          "description": "The friendly name of the beacon."
+        }
+      }
+    },
+    "remove_beacon": {
+      "name": "Remove Beacon",
+      "description": "Remove a BLE beacon.",
+      "fields": {
+        "mac_address": {
+          "name": "MAC Address",
+          "description": "The MAC address of the BLE beacon to remove."
+        }
+      }
+    }
+  }
+}

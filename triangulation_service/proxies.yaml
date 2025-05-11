@@ -1,0 +1,30 @@
+proxies:
+  kitchen_proxy:
+    latitude: 25.1201
+    longitude: 55.3089
+  bedroom_proxy:
+    latitude: 25.1203
+    longitude: 55.3091
+  livingroom_proxy:
+    latitude: 25.1205
+    longitude: 55.3093
+
+# Signal propagation parameters
+signal:
+  # Typical measured power at 1 meter distance
+  tx_power: -59
+  # Path-loss exponent (2.0 for free space, higher for indoors)
+  path_loss_exponent: 2.0
+  # EMA smoothing factor for RSSI (0-1, higher = less smoothing)
+  rssi_smoothing: 0.3
+  # EMA smoothing factor for position (0-1, higher = less smoothing)
+  position_smoothing: 0.2
+  # Maximum age of readings to consider (seconds)
+  max_reading_age: 30
+  # Minimum number of proxies needed for triangulation
+  min_proxies: 2
+
+# Beacon mappings (display names)
+beacons:
+  "C7:9B:6A:32:BB:0E": "Jayden's Backpack"
+  # Add more beacons as needed

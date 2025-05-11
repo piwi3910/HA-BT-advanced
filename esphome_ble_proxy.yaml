@@ -1,0 +1,83 @@
+substitutions:
+  proxy_id: kitchen_proxy  # Change this for each ESP32 device
+  name: "${proxy_id}"
+  friendly_name: "${proxy_id} BLE Proxy"
+
+esphome:
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+# Enable OTA updates
+ota:
+
+# Enable WiFi
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  # Enable fallback hotspot in case of connection failure
+  ap:
+    ssid: "${name} Fallback Hotspot"
+    password: !secret fallback_ap_password
+
+# Enable MQTT for proxying BLE data
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  client_id: "${name}"
+
+# Enable BLE tracking
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 1100ms
+    active: false
+
+# Time component to provide accurate timestamps
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+# Custom BLE scanner component
+ibeacon:
+  - id: ble_scanner
+    on_ibeacon:
+      then:
+        - mqtt.publish:
+            topic: "ble-triangulation/${proxy_id}"
+            payload: |-
+              {
+                "proxy_id": "${proxy_id}",
+                "beacon_mac": "{{ format('%02X:%02X:%02X:%02X:%02X:%02X', 
+                                   x.address[0], x.address[1], x.address[2], 
+                                   x.address[3], x.address[4], x.address[5]) }}",
+                "rssi": {{ x.rssi }},
+                "timestamp": "{{ now().strftime('%Y-%m-%dT%H:%M:%SZ') }}"
+              }
+
+# Sensor to monitor system health
+sensor:
+  - platform: wifi_signal
+    name: "${name} WiFi Signal"
+    update_interval: 60s
+    
+  - platform: uptime
+    name: "${name} Uptime"
+    update_interval: 60s
+    
+  - platform: internal_temperature
+    name: "${name} Temperature"
+    id: internal_temperature
+    update_interval: 60s
