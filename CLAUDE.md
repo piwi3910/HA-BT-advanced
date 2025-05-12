@@ -135,3 +135,26 @@ When adding new features to the project, consider:
 3. For UI enhancements:
    - Update the config panel in `config.py`
    - Add translations in `translations/en.json`
+
+## Validation Steps
+
+To ensure the integration meets Home Assistant and HACS requirements:
+
+1. Run the comprehensive validation script:
+   ```bash
+   ./tools/validate.sh
+   ```
+
+2. This script checks:
+   - Basic validation for manifest.json, HACS.json, services.yaml, and translations
+   - Docker-based hassfest validation (same as GitHub Actions uses)
+   - Docker-based HACS validation
+
+3. Common validation issues and fixes:
+   - Manifest.json keys must be properly ordered: domain, name, then alphabetical
+   - Services.yaml number selectors sometimes need specific formatting for step values
+   - HACS.json should only include allowed fields: name, render_readme, homeassistant
+
+4. GitHub-specific validation requirements:
+   - Add repository description and topics in GitHub settings
+   - Consider adding to Home Assistant brands repository for official icon

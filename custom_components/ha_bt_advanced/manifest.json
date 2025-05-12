@@ -5,9 +5,9 @@
   "config_flow": true,
   "dependencies": ["mqtt", "http"],
   "documentation": "https://github.com/piwi3910/HA-BT-advanced",
-  "issue_tracker": "https://github.com/piwi3910/HA-BT-advanced/issues",
   "integration_type": "device",
   "iot_class": "local_push",
+  "issue_tracker": "https://github.com/piwi3910/HA-BT-advanced/issues",
   "requirements": ["pyyaml>=6.0"],
   "version": "0.1.0"
 }

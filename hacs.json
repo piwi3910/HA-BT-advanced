@@ -1,8 +1,5 @@
 {
   "name": "HA-BT-Advanced",
   "render_readme": true,
-  "iot_class": "local_push",
-  "domains": ["device_tracker", "sensor", "binary_sensor"],
-  "country": "US",
   "homeassistant": "2023.8.0"
 }

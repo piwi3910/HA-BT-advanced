@@ -96,8 +96,8 @@ add_proxy:
         number:
           min: -90
           max: 90
-          step: 0.000001
           mode: box
+          step: 0.0000001
     longitude:
       name: Longitude
       description: The longitude of the proxy location.
@@ -107,8 +107,8 @@ add_proxy:
         number:
           min: -180
           max: 180
-          step: 0.000001
           mode: box
+          step: 0.0000001
 
 remove_proxy:
   name: Remove Proxy

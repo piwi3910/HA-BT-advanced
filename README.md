@@ -172,6 +172,24 @@ See the [Advanced Configuration](https://github.com/piwi3910/HA-BT-advanced/wiki
 - Relative distance between beacons
 - Tag-to-tag proximity detection
 
+## Development
+
+### Local Validation
+
+This integration includes a local validation script to check for HACS and Home Assistant compatibility:
+
+```bash
+./tools/validate.sh
+```
+
+This script checks:
+- manifest.json requirements
+- HACS.json requirements
+- services.yaml formatting
+- translations structure
+
+For more details, see [VALIDATION.md](VALIDATION.md).
+
 ## Author
 
 Pascal Watteel (pascal@watteel.com)
