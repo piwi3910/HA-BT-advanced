@@ -9,5 +9,6 @@
   "integration_type": "device",
   "iot_class": "local_push",
   "requirements": ["pyyaml>=6.0"],
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "minimum_ha_version": "2023.5.0"
 }

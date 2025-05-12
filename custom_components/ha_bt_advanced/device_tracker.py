@@ -24,12 +24,13 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
-    hass: HomeAssistant, 
-    config_entry: ConfigEntry, 
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up device tracker for BLE Triangulation component."""
-    manager = hass.data[DOMAIN][config_entry.entry_id]["manager"]
+    from .const import DATA_MANAGER
+    manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
     
     @callback
     def async_add_beacon(beacon_id: str, beacon_name: str) -> None:

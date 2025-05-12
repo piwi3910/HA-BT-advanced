@@ -37,6 +37,7 @@ from .const import (
     CONF_MQTT_USERNAME,
     CONF_MQTT_PASSWORD,
     CONF_FALLBACK_PASSWORD,
+    DATA_MANAGER,
 )
 from . import esphome_wizard
 
@@ -1246,7 +1247,7 @@ class ProxyListView(HomeAssistantView):
         """Initialize."""
         self.hass = hass
         self.config_entry = config_entry
-        self.manager = hass.data[DOMAIN][config_entry.entry_id]["manager"]
+        self.manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
 
     async def get(self, request):
         """Handle GET request."""
@@ -1290,7 +1291,7 @@ class ProxyView(HomeAssistantView):
         """Initialize."""
         self.hass = hass
         self.config_entry = config_entry
-        self.manager = hass.data[DOMAIN][config_entry.entry_id]["manager"]
+        self.manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
 
     async def get(self, request, proxy_id):
         """Handle GET request."""
@@ -1347,7 +1348,7 @@ class BeaconListView(HomeAssistantView):
         """Initialize."""
         self.hass = hass
         self.config_entry = config_entry
-        self.manager = hass.data[DOMAIN][config_entry.entry_id]["manager"]
+        self.manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
 
     async def get(self, request):
         """Handle GET request."""
@@ -1393,7 +1394,7 @@ class BeaconView(HomeAssistantView):
         """Initialize."""
         self.hass = hass
         self.config_entry = config_entry
-        self.manager = hass.data[DOMAIN][config_entry.entry_id]["manager"]
+        self.manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
 
     async def get(self, request, mac):
         """Handle GET request."""
@@ -1452,7 +1453,7 @@ class ZoneListView(HomeAssistantView):
         """Initialize."""
         self.hass = hass
         self.config_entry = config_entry
-        self.manager = hass.data[DOMAIN][config_entry.entry_id]["manager"]
+        self.manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
 
     async def get(self, request):
         """Handle GET request."""
@@ -1500,7 +1501,7 @@ class ZoneView(HomeAssistantView):
         """Initialize."""
         self.hass = hass
         self.config_entry = config_entry
-        self.manager = hass.data[DOMAIN][config_entry.entry_id]["manager"]
+        self.manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
 
     async def get(self, request, zone_id):
         """Handle GET request."""
@@ -1561,7 +1562,7 @@ class ESPHomeConfigView(HomeAssistantView):
         """Initialize."""
         self.hass = hass
         self.config_entry = config_entry
-        self.manager = hass.data[DOMAIN][config_entry.entry_id]["manager"]
+        self.manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
 
     async def post(self, request):
         """Handle POST request."""

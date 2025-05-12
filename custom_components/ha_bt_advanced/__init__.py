@@ -81,17 +81,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = {
         DATA_CONFIG: dict(entry.data)
     }
-    
+
     # Create config directories if they don't exist
     for directory in [PROXY_CONFIG_DIR, BEACON_CONFIG_DIR, ZONE_CONFIG_DIR]:
         config_dir = Path(hass.config.path(directory))
         if not config_dir.exists():
             _LOGGER.info(f"Creating configuration directory: {config_dir}")
             config_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Initialize manager
     manager = TriangulationManager(hass, entry)
     hass.data[DOMAIN][entry.entry_id][DATA_MANAGER] = manager
+
+    # For backward compatibility with any code that might use 'manager' string key
+    hass.data[DOMAIN][entry.entry_id]["manager"] = manager
     
     # Register services
     async def handle_restart(call: ServiceCall) -> None:
@@ -333,16 +336,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     # Stop the manager
-    manager = hass.data[DOMAIN][entry.entry_id][DATA_MANAGER]
+    # Try both keys for backward compatibility
+    if DATA_MANAGER in hass.data[DOMAIN][entry.entry_id]:
+        manager = hass.data[DOMAIN][entry.entry_id][DATA_MANAGER]
+    else:
+        manager = hass.data[DOMAIN][entry.entry_id]["manager"]
+
     await manager.stop()
-    
+
     # Unload the platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    
+
     # Remove the entry data
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
-    
+
     return unload_ok
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
