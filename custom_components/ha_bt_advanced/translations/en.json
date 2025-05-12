@@ -11,7 +11,8 @@
           "position_smoothing": "Position Smoothing Factor (0-1)",
           "max_reading_age": "Max Reading Age (seconds)",
           "min_proxies": "Minimum Proxies for Triangulation",
-          "mqtt_topic": "MQTT Topic Prefix"
+          "mqtt_topic": "MQTT Topic Prefix",
+          "environment_preset": "Environment Preset"
         }
       }
     },
@@ -40,15 +41,52 @@
   "entity": {
     "sensor": {
       "signal_strength": {
-        "name": "Signal Strength"
+        "name": "Signal Strength",
+        "state_attributes": {
+          "proxy_id": "Proxy ID"
+        }
       },
-      "beacon_distance": {
-        "name": "Estimated Distance"
+      "distance": {
+        "name": "Distance",
+        "state_attributes": {
+          "proxy_id": "Proxy ID"
+        }
+      },
+      "accuracy": {
+        "name": "Accuracy",
+        "state_attributes": {
+          "num_proxies": "Number of Proxies",
+          "contributing_proxies": "Contributing Proxies"
+        }
+      },
+      "zone": {
+        "name": "Zone",
+        "state_attributes": {
+          "zone_id": "Zone ID",
+          "zone_type": "Zone Type"
+        }
       }
     },
     "binary_sensor": {
-      "beacon_detected": {
-        "name": "Beacon Detected"
+      "presence": {
+        "name": "Presence",
+        "state_attributes": {
+          "last_seen": "Last Seen"
+        }
+      },
+      "zone_presence": {
+        "name": "Zone Presence",
+        "state_attributes": {
+          "zone_id": "Zone ID",
+          "zone_name": "Zone Name"
+        }
+      },
+      "proxy_connectivity": {
+        "name": "Proxy Connectivity",
+        "state_attributes": {
+          "proxy_id": "Proxy ID",
+          "last_seen": "Last Seen"
+        }
       }
     }
   },
@@ -68,6 +106,22 @@
         "name": {
           "name": "Name",
           "description": "The friendly name of the beacon."
+        },
+        "category": {
+          "name": "Category",
+          "description": "The category of the beacon."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "The icon to use for the beacon."
+        },
+        "tx_power": {
+          "name": "TX Power",
+          "description": "The transmission power at 1 meter."
+        },
+        "path_loss_exponent": {
+          "name": "Path Loss Exponent",
+          "description": "The path loss exponent for signal degradation."
         }
       }
     },
@@ -78,6 +132,122 @@
         "mac_address": {
           "name": "MAC Address",
           "description": "The MAC address of the BLE beacon to remove."
+        }
+      }
+    },
+    "add_proxy": {
+      "name": "Add Proxy",
+      "description": "Add a new BLE proxy (ESP32 device).",
+      "fields": {
+        "proxy_id": {
+          "name": "Proxy ID",
+          "description": "A unique identifier for the proxy."
+        },
+        "latitude": {
+          "name": "Latitude",
+          "description": "The latitude of the proxy location."
+        },
+        "longitude": {
+          "name": "Longitude",
+          "description": "The longitude of the proxy location."
+        }
+      }
+    },
+    "remove_proxy": {
+      "name": "Remove Proxy",
+      "description": "Remove a BLE proxy.",
+      "fields": {
+        "proxy_id": {
+          "name": "Proxy ID",
+          "description": "The identifier of the proxy to remove."
+        }
+      }
+    },
+    "add_zone": {
+      "name": "Add Zone",
+      "description": "Add a new zone for location tracking.",
+      "fields": {
+        "zone_id": {
+          "name": "Zone ID",
+          "description": "A unique identifier for the zone."
+        },
+        "name": {
+          "name": "Name",
+          "description": "A friendly name for the zone."
+        },
+        "type": {
+          "name": "Type",
+          "description": "The type of zone."
+        },
+        "coordinates": {
+          "name": "Coordinates",
+          "description": "A list of coordinate pairs defining the zone polygon."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "The icon to use for the zone."
+        }
+      }
+    },
+    "remove_zone": {
+      "name": "Remove Zone",
+      "description": "Remove a zone.",
+      "fields": {
+        "zone_id": {
+          "name": "Zone ID",
+          "description": "The identifier of the zone to remove."
+        }
+      }
+    },
+    "calibrate": {
+      "name": "Calibrate",
+      "description": "Calibrate a beacon with new signal parameters.",
+      "fields": {
+        "mac_address": {
+          "name": "MAC Address",
+          "description": "The MAC address of the beacon to calibrate."
+        },
+        "tx_power": {
+          "name": "TX Power",
+          "description": "The transmission power at 1 meter."
+        },
+        "path_loss_exponent": {
+          "name": "Path Loss Exponent",
+          "description": "The path loss exponent for signal degradation."
+        }
+      }
+    },
+    "generate_esphome_config": {
+      "name": "Generate ESPHome Configuration",
+      "description": "Generate an ESPHome configuration file for a proxy.",
+      "fields": {
+        "proxy_id": {
+          "name": "Proxy ID",
+          "description": "The identifier of the proxy to generate configuration for."
+        },
+        "wifi_ssid": {
+          "name": "WiFi SSID",
+          "description": "The SSID of the WiFi network to connect to."
+        },
+        "wifi_password": {
+          "name": "WiFi Password",
+          "description": "The password for the WiFi network."
+        },
+        "fallback_password": {
+          "name": "Fallback AP Password",
+          "description": "The password for the fallback access point mode."
+        },
+        "mqtt_host": {
+          "name": "MQTT Host",
+          "description": "The hostname or IP address of the MQTT broker."
+        },
+        "mqtt_username": {
+          "name": "MQTT Username",
+          "description": "The username for the MQTT broker."
+        },
+        "mqtt_password": {
+          "name": "MQTT Password",
+          "description": "The password for the MQTT broker."
         }
       }
     }

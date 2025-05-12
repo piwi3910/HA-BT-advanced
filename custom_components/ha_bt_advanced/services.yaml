@@ -20,6 +20,49 @@ add_beacon:
       example: "Jayden's Backpack"
       selector:
         text:
+    category:
+      name: Category
+      description: The category of the beacon.
+      required: false
+      example: "item"
+      default: "item"
+      selector:
+        select:
+          options:
+            - "person"
+            - "item"
+            - "pet"
+            - "vehicle"
+            - "other"
+    icon:
+      name: Icon
+      description: The icon to use for the beacon.
+      required: false
+      example: "mdi:backpack"
+      selector:
+        icon:
+    tx_power:
+      name: TX Power
+      description: The transmission power of the beacon at 1 meter distance.
+      required: false
+      example: -59
+      default: -59
+      selector:
+        number:
+          min: -100
+          max: 0
+          step: 1
+    path_loss_exponent:
+      name: Path Loss Exponent
+      description: The path loss exponent for this beacon (signal degradation factor).
+      required: false
+      example: 2.0
+      default: 2.0
+      selector:
+        number:
+          min: 1.0
+          max: 4.0
+          step: 0.1
 
 remove_beacon:
   name: Remove Beacon
@@ -30,5 +73,189 @@ remove_beacon:
       description: The MAC address of the BLE beacon to remove.
       required: true
       example: "C7:9B:6A:32:BB:0E"
+      selector:
+        text:
+
+add_proxy:
+  name: Add Proxy
+  description: Add a new BLE proxy (ESP32 device).
+  fields:
+    proxy_id:
+      name: Proxy ID
+      description: A unique identifier for the proxy.
+      required: true
+      example: "living_room_proxy"
+      selector:
+        text:
+    latitude:
+      name: Latitude
+      description: The latitude of the proxy location.
+      required: true
+      example: 37.7749
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: 0.0000001
+          mode: box
+    longitude:
+      name: Longitude
+      description: The longitude of the proxy location.
+      required: true
+      example: -122.4194
+      selector:
+        number:
+          min: -180
+          max: 180
+          step: 0.0000001
+          mode: box
+
+remove_proxy:
+  name: Remove Proxy
+  description: Remove a BLE proxy from the system.
+  fields:
+    proxy_id:
+      name: Proxy ID
+      description: The identifier of the proxy to remove.
+      required: true
+      example: "living_room_proxy"
+      selector:
+        text:
+
+add_zone:
+  name: Add Zone
+  description: Add a new zone for location tracking.
+  fields:
+    zone_id:
+      name: Zone ID
+      description: A unique identifier for the zone.
+      required: true
+      example: "living_room"
+      selector:
+        text:
+    name:
+      name: Name
+      description: A friendly name for the zone.
+      required: true
+      example: "Living Room"
+      selector:
+        text:
+    type:
+      name: Type
+      description: The type of zone.
+      required: true
+      example: "room"
+      selector:
+        select:
+          options:
+            - "room"
+            - "home"
+            - "work"
+            - "custom"
+    coordinates:
+      name: Coordinates
+      description: A list of [latitude, longitude] pairs defining the zone polygon.
+      required: true
+      example: "[[37.7749, -122.4194], [37.7750, -122.4194], [37.7750, -122.4193], [37.7749, -122.4193]]"
+    icon:
+      name: Icon
+      description: The icon to use for the zone.
+      required: false
+      example: "mdi:sofa"
+      selector:
+        icon:
+
+remove_zone:
+  name: Remove Zone
+  description: Remove a zone from the system.
+  fields:
+    zone_id:
+      name: Zone ID
+      description: The identifier of the zone to remove.
+      required: true
+      example: "living_room"
+      selector:
+        text:
+
+calibrate:
+  name: Calibrate
+  description: Calibrate a beacon with new signal parameters.
+  fields:
+    mac_address:
+      name: MAC Address
+      description: The MAC address of the beacon to calibrate.
+      required: true
+      example: "C7:9B:6A:32:BB:0E"
+      selector:
+        text:
+    tx_power:
+      name: TX Power
+      description: The transmission power of the beacon at 1 meter distance.
+      required: false
+      example: -59
+      selector:
+        number:
+          min: -100
+          max: 0
+          step: 1
+    path_loss_exponent:
+      name: Path Loss Exponent
+      description: The path loss exponent for this beacon (signal degradation factor).
+      required: false
+      example: 2.0
+      selector:
+        number:
+          min: 1.0
+          max: 4.0
+          step: 0.1
+
+generate_esphome_config:
+  name: Generate ESPHome Configuration
+  description: Generate an ESPHome configuration file for a proxy.
+  fields:
+    proxy_id:
+      name: Proxy ID
+      description: The identifier of the proxy to generate configuration for.
+      required: true
+      example: "living_room_proxy"
+      selector:
+        text:
+    wifi_ssid:
+      name: WiFi SSID
+      description: The SSID of the WiFi network to connect to.
+      required: true
+      example: "MyHomeWifi"
+      selector:
+        text:
+    wifi_password:
+      name: WiFi Password
+      description: The password for the WiFi network.
+      required: true
+      selector:
+        text:
+    fallback_password:
+      name: Fallback AP Password
+      description: The password for the fallback access point mode.
+      required: true
+      selector:
+        text:
+    mqtt_host:
+      name: MQTT Host
+      description: The hostname or IP address of the MQTT broker.
+      required: true
+      example: "192.168.1.100"
+      selector:
+        text:
+    mqtt_username:
+      name: MQTT Username
+      description: The username for the MQTT broker.
+      required: false
+      example: "mqtt_user"
+      selector:
+        text:
+    mqtt_password:
+      name: MQTT Password
+      description: The password for the MQTT broker.
+      required: false
       selector:
         text:

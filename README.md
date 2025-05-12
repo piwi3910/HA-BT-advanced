@@ -7,20 +7,23 @@ This project implements a system for tracking Bluetooth Low Energy (BLE) beacons
 ## Key Features
 
 - 🧙‍♂️ **Complete GUI Setup** - No YAML editing required! Everything configurable in the UI
+- 🗺️ **Visual Configuration Panel** - Set up proxies, beacons, and zones with a map interface
 - 🔍 **Auto-Discovery** - Automatically detects and adds new beacons as they appear
-- 📡 Multiple ESP32 devices with ESPHome firmware act as BLE scanning proxies
-- 🔄 MQTT messaging for BLE scan data
-- 📐 Custom triangulation service with tunable path-loss model
-- 🗺️ Home Assistant map integration with accuracy circles
-- 📱 Track any BLE iBeacon device (tags, smartphones, wearables)
+- 📡 **ESP32 Proxy Integration** - Multiple ESP32 devices with auto-generated ESPHome firmware
+- 📐 **Advanced Triangulation** - Custom algorithms with signal and position smoothing
+- 🏠 **Zone Management** - Define custom zones and track beacon presence in zones
+- 📱 **Multi-Category Tracking** - Specialized tracking for people, pets, items, and vehicles
+- 🔔 **Notifications** - Get alerts when proxies go offline or beacons go missing
 
 ## Quick Setup Wizard
 
 The integration features a step-by-step setup wizard that handles all configuration:
 
 1. **Base setup** - Configure signal parameters with suggested defaults
-2. **Proxy configuration** - Add proxies visually on a map
-3. **Beacon auto-discovery** - Beacons are automatically detected and named
+2. **Environment Selection** - Choose presets for home, office, or open spaces
+3. **Proxy configuration** - Add proxies visually on a map
+4. **Zone configuration** - Define areas on the map for presence detection
+5. **Beacon management** - Categorize and customize auto-discovered beacons
 
 **No YAML editing required!** The integration provides a complete graphical interface for all configuration.
 
@@ -29,7 +32,8 @@ The integration features a step-by-step setup wizard that handles all configurat
 1. **ESPHome Proxies**: ESP32 devices running custom ESPHome firmware scan for iBeacon advertisements
 2. **MQTT Bridge**: BLE data is published through MQTT
 3. **Triangulation Service**: Built directly into Home Assistant, performs triangulation calculations
-4. **Home Assistant Integration**: Visual management of proxies and beacons through a fully graphical interface
+4. **Zone Management**: Custom polygonal zones for presence detection
+5. **Home Assistant Integration**: Visual management of proxies and beacons through a fully graphical interface
 
 ## Installation
 
@@ -53,34 +57,46 @@ The integration features a step-by-step setup wizard that handles all configurat
 3. Go to **Settings** → **Devices & Services** → **Add Integration** and search for "HA-BT-Advanced"
 4. Follow the setup wizard to configure the integration
 
-## The Configuration Wizard
+## The Configuration Panel
 
-After installation, the integration provides a step-by-step configuration wizard:
+After installation, access the configuration panel from the sidebar:
 
-### Step 1: Basic Configuration
-
-![Configuration Screenshot](https://github.com/piwi3910/HA-BT-advanced/raw/main/images/config_screen.png)
-
-- Set signal parameters (with reasonable defaults)
-- Configure MQTT topic prefixes
-- Enable/disable the built-in triangulation service
-
-### Step 2: Proxy Configuration
-
-Navigate to "HA-BT-Advanced" in the Configuration panel to:
+### Proxy Configuration
 
 - Add proxies visually using a map interface
 - Enter proxy locations by dragging pins on the map
-- Generate and download ESP32 firmware files directly from the UI
+- Manage proxy configuration with a user-friendly UI
+- Monitor proxy status with connectivity sensors
 
-### Step 3: Beacon Management
+### Beacon Management
 
 Beacons are automatically discovered when they come into range of your proxies. From the UI you can:
 
 - Rename detected beacons with friendly names
+- Categorize beacons as people, pets, items, or vehicles
+- Choose custom icons based on beacon category
 - Monitor signal strength and estimated distance
 - View all beacons on the Home Assistant map
-- Add beacons manually if needed
+- Calibrate beacons for more accurate positioning
+
+### Zone Configuration
+
+Define custom zones on the map to track beacon presence:
+
+- Create zones by drawing polygons on a map
+- Name and categorize zones (home, work, room, custom)
+- Track when beacons enter or leave zones
+- Get notifications for zone changes
+- Use zone presence in automations
+
+### ESPHome Configuration
+
+Generate and download ESPHome configuration for your ESP32 proxies:
+
+- Automatically generate YAML configuration
+- Pre-configured MQTT settings for instant connection
+- Easy setup with WiFi and broker credentials
+- Download and flash directly to your ESP32 devices
 
 ## Home Assistant Entities
 
@@ -89,7 +105,14 @@ For each beacon, the integration automatically creates:
 - **Device Tracker Entity**: Shows the beacon location on your map
 - **Signal Strength Sensor**: Tracks RSSI values from each proxy
 - **Distance Sensor**: Shows estimated distance in meters
+- **Accuracy Sensor**: Indicates positioning accuracy in meters
+- **Zone Sensor**: Shows which zone the beacon is currently in
 - **Presence Binary Sensor**: Detects if the beacon is currently present
+- **Zone Presence Binary Sensors**: One for each zone to track presence
+
+For each proxy, the integration creates:
+
+- **Connectivity Binary Sensor**: Shows if the proxy is online
 
 ## Signal Propagation Tuning
 
@@ -100,11 +123,36 @@ The relationship between RSSI and distance is affected by environmental factors.
 - **RSSI Smoothing**: Reduces signal fluctuations 
 - **Position Smoothing**: Creates smoother movement paths
 
+### Environment Presets
+
+Choose from presets for common environments:
+
+- **Home**: Optimized for residential settings
+- **Office**: Tuned for office environments with partitions
+- **Open Space**: For large open areas
+- **Custom**: Manually tune all parameters
+
+## Services
+
+The integration provides several services for automation:
+
+- **restart**: Restart the BLE Triangulation service
+- **add_beacon**: Add a new beacon manually
+- **remove_beacon**: Remove a beacon from the system
+- **add_proxy**: Add a new ESP32 proxy
+- **remove_proxy**: Remove a proxy from the system
+- **add_zone**: Add a new zone for location tracking
+- **remove_zone**: Remove a zone from the system
+- **calibrate**: Calibrate a beacon with new signal parameters
+- **generate_esphome_config**: Generate an ESPHome configuration for a proxy
+
 ## Troubleshooting
 
 - **No beacons detected**: Ensure your iBeacons are active and within range of at least two proxies
 - **Poor accuracy**: Adjust the `tx_power` and `path_loss_exponent` values in the integration settings
 - **Erratic movement**: Increase smoothing factors in the configuration settings
+- **Proxy offline**: Check your ESP32 device's connection to WiFi and MQTT
+- **Zone detection issues**: Ensure your zones have properly defined coordinates
 
 ## Advanced: Standalone Mode
 
@@ -120,8 +168,9 @@ See the [Advanced Configuration](https://github.com/piwi3910/HA-BT-advanced/wiki
 
 - Mobile device BLE + GPS fusion
 - Floorplan integration
-- Room-level zoning
 - 3D positioning with altitude
+- Relative distance between beacons
+- Tag-to-tag proximity detection
 
 ## Author
 

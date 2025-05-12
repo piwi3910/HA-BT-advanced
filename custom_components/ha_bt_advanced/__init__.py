@@ -11,6 +11,7 @@ from homeassistant.const import (
     CONF_NAME,
     CONF_LATITUDE,
     CONF_LONGITUDE,
+    CONF_ICON,
     Platform,
 )
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -27,19 +28,41 @@ from .const import (
     CONF_PATH_LOSS_EXPONENT,
     CONF_RSSI_SMOOTHING,
     CONF_POSITION_SMOOTHING,
+    CONF_MAX_READING_AGE,
+    CONF_MIN_PROXIES,
     CONF_SERVICE_ENABLED,
+    CONF_BEACON_CATEGORY,
+    CONF_BEACON_ICON,
+    CONF_ZONE_ID,
+    CONF_ZONE_NAME,
+    CONF_ZONE_TYPE,
+    CONF_ZONE_COORDINATES,
     DATA_CONFIG,
+    DATA_MANAGER,
     DEFAULT_TX_POWER,
     DEFAULT_PATH_LOSS_EXPONENT,
     DEFAULT_RSSI_SMOOTHING,
     DEFAULT_POSITION_SMOOTHING,
     PROXY_CONFIG_DIR,
     BEACON_CONFIG_DIR,
+    ZONE_CONFIG_DIR,
     SERVICE_RESTART,
     SERVICE_ADD_BEACON,
     SERVICE_REMOVE_BEACON,
+    SERVICE_ADD_PROXY,
+    SERVICE_REMOVE_PROXY,
+    SERVICE_ADD_ZONE,
+    SERVICE_REMOVE_ZONE,
+    SERVICE_CALIBRATE,
+    SERVICE_GENERATE_ESPHOME,
+    BEACON_CATEGORY_PERSON,
+    BEACON_CATEGORY_ITEM,
+    BEACON_CATEGORY_PET,
+    BEACON_CATEGORY_VEHICLE,
+    BEACON_CATEGORY_OTHER,
 )
 from .manager import TriangulationManager
+import homeassistant.helpers.entity_component
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,7 +83,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
     
     # Create config directories if they don't exist
-    for directory in [PROXY_CONFIG_DIR, BEACON_CONFIG_DIR]:
+    for directory in [PROXY_CONFIG_DIR, BEACON_CONFIG_DIR, ZONE_CONFIG_DIR]:
         config_dir = Path(hass.config.path(directory))
         if not config_dir.exists():
             _LOGGER.info(f"Creating configuration directory: {config_dir}")
@@ -68,7 +91,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Initialize manager
     manager = TriangulationManager(hass, entry)
-    hass.data[DOMAIN][entry.entry_id]["manager"] = manager
+    hass.data[DOMAIN][entry.entry_id][DATA_MANAGER] = manager
     
     # Register services
     async def handle_restart(call: ServiceCall) -> None:
@@ -83,7 +106,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         """Handle the add_beacon service call."""
         mac_address = call.data.get(CONF_MAC_ADDRESS)
         name = call.data.get(CONF_NAME)
-        await manager.add_beacon(mac_address, name)
+        category = call.data.get(CONF_BEACON_CATEGORY, BEACON_CATEGORY_ITEM)
+        icon = call.data.get(CONF_BEACON_ICON)
+        tx_power = call.data.get(CONF_TX_POWER)
+        path_loss_exponent = call.data.get(CONF_PATH_LOSS_EXPONENT)
+        
+        await manager.add_beacon(
+            mac_address=mac_address,
+            name=name,
+            category=category,
+            icon=icon,
+            tx_power=tx_power,
+            path_loss_exponent=path_loss_exponent
+        )
     
     hass.services.async_register(
         DOMAIN, 
@@ -92,6 +127,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         schema=vol.Schema({
             vol.Required(CONF_MAC_ADDRESS): cv.string,
             vol.Required(CONF_NAME): cv.string,
+            vol.Optional(CONF_BEACON_CATEGORY): vol.In([
+                BEACON_CATEGORY_PERSON,
+                BEACON_CATEGORY_ITEM,
+                BEACON_CATEGORY_PET,
+                BEACON_CATEGORY_VEHICLE,
+                BEACON_CATEGORY_OTHER,
+            ]),
+            vol.Optional(CONF_BEACON_ICON): cv.string,
+            vol.Optional(CONF_TX_POWER): vol.Coerce(float),
+            vol.Optional(CONF_PATH_LOSS_EXPONENT): vol.Coerce(float),
         })
     )
     
@@ -109,6 +154,173 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         })
     )
     
+    async def handle_add_proxy(call: ServiceCall) -> None:
+        """Handle the add_proxy service call."""
+        proxy_id = call.data.get(CONF_PROXY_ID)
+        latitude = call.data.get(CONF_LATITUDE)
+        longitude = call.data.get(CONF_LONGITUDE)
+        
+        await manager.add_proxy(proxy_id, latitude, longitude)
+    
+    hass.services.async_register(
+        DOMAIN, 
+        SERVICE_ADD_PROXY, 
+        handle_add_proxy, 
+        schema=vol.Schema({
+            vol.Required(CONF_PROXY_ID): cv.string,
+            vol.Required(CONF_LATITUDE): cv.latitude,
+            vol.Required(CONF_LONGITUDE): cv.longitude,
+        })
+    )
+    
+    async def handle_remove_proxy(call: ServiceCall) -> None:
+        """Handle the remove_proxy service call."""
+        proxy_id = call.data.get(CONF_PROXY_ID)
+        await manager.remove_proxy(proxy_id)
+    
+    hass.services.async_register(
+        DOMAIN, 
+        SERVICE_REMOVE_PROXY, 
+        handle_remove_proxy, 
+        schema=vol.Schema({
+            vol.Required(CONF_PROXY_ID): cv.string,
+        })
+    )
+    
+    async def handle_add_zone(call: ServiceCall) -> None:
+        """Handle the add_zone service call."""
+        zone_id = call.data.get(CONF_ZONE_ID)
+        name = call.data.get(CONF_ZONE_NAME)
+        zone_type = call.data.get(CONF_ZONE_TYPE)
+        coordinates = call.data.get(CONF_ZONE_COORDINATES)
+        icon = call.data.get(CONF_ICON)
+        
+        await manager.zone_manager.add_zone(
+            zone_id=zone_id,
+            name=name,
+            zone_type=zone_type,
+            coordinates=coordinates,
+            icon=icon,
+        )
+    
+    hass.services.async_register(
+        DOMAIN, 
+        SERVICE_ADD_ZONE, 
+        handle_add_zone, 
+        schema=vol.Schema({
+            vol.Required(CONF_ZONE_ID): cv.string,
+            vol.Required(CONF_ZONE_NAME): cv.string,
+            vol.Required(CONF_ZONE_TYPE): cv.string,
+            vol.Required(CONF_ZONE_COORDINATES): vol.All(
+                cv.ensure_list, [vol.All(cv.ensure_list, [cv.latitude, cv.longitude])]
+            ),
+            vol.Optional(CONF_ICON): cv.string,
+        })
+    )
+    
+    async def handle_remove_zone(call: ServiceCall) -> None:
+        """Handle the remove_zone service call."""
+        zone_id = call.data.get(CONF_ZONE_ID)
+        await manager.zone_manager.remove_zone(zone_id)
+    
+    hass.services.async_register(
+        DOMAIN, 
+        SERVICE_REMOVE_ZONE, 
+        handle_remove_zone, 
+        schema=vol.Schema({
+            vol.Required(CONF_ZONE_ID): cv.string,
+        })
+    )
+    
+    async def handle_calibrate(call: ServiceCall) -> None:
+        """Handle the calibrate service call."""
+        mac_address = call.data.get(CONF_MAC_ADDRESS)
+        tx_power = call.data.get(CONF_TX_POWER)
+        path_loss_exponent = call.data.get(CONF_PATH_LOSS_EXPONENT)
+
+        await manager.calibrate_beacon(
+            mac_address=mac_address,
+            tx_power=tx_power,
+            path_loss_exponent=path_loss_exponent,
+        )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CALIBRATE,
+        handle_calibrate,
+        schema=vol.Schema({
+            vol.Required(CONF_MAC_ADDRESS): cv.string,
+            vol.Optional(CONF_TX_POWER): vol.Coerce(float),
+            vol.Optional(CONF_PATH_LOSS_EXPONENT): vol.Coerce(float),
+        })
+    )
+
+    async def handle_generate_esphome_config(call: ServiceCall) -> None:
+        """Handle the generate_esphome_config service call."""
+        from .esphome_wizard import generate_esphome_config, create_esphome_secrets, save_esphome_config
+
+        proxy_id = call.data.get(CONF_PROXY_ID)
+        wifi_ssid = call.data.get(CONF_WIFI_SSID)
+        wifi_password = call.data.get(CONF_WIFI_PASSWORD)
+        fallback_password = call.data.get(CONF_FALLBACK_PASSWORD)
+        mqtt_host = call.data.get(CONF_MQTT_HOST)
+        mqtt_username = call.data.get(CONF_MQTT_USERNAME, "")
+        mqtt_password = call.data.get(CONF_MQTT_PASSWORD, "")
+
+        try:
+            # Prepare MQTT config
+            mqtt_config = {
+                "broker": mqtt_host,
+                "username": mqtt_username,
+                "password": mqtt_password,
+            }
+
+            # Generate configuration
+            config = generate_esphome_config(
+                proxy_id=proxy_id,
+                mqtt_config=mqtt_config,
+                mqtt_topic_prefix=manager.mqtt_topic_prefix
+            )
+
+            # Create output directory
+            config_dir = hass.config.path(f"esphome/{DOMAIN}")
+
+            # Save configuration and secrets
+            config_path = save_esphome_config(proxy_id, config, config_dir)
+            secrets_path = create_esphome_secrets(
+                config_dir,
+                wifi_ssid,
+                wifi_password,
+                fallback_password
+            )
+
+            _LOGGER.info(f"Generated ESPHome configuration for {proxy_id} at {config_path}")
+
+            # Return the configuration content to the caller
+            return {
+                "config_path": config_path,
+                "secrets_path": secrets_path,
+                "config_content": config,
+            }
+        except Exception as e:
+            _LOGGER.error(f"Error generating ESPHome configuration: {e}")
+            raise
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GENERATE_ESPHOME,
+        handle_generate_esphome_config,
+        schema=vol.Schema({
+            vol.Required(CONF_PROXY_ID): cv.string,
+            vol.Required(CONF_WIFI_SSID): cv.string,
+            vol.Required(CONF_WIFI_PASSWORD): cv.string,
+            vol.Required(CONF_FALLBACK_PASSWORD): cv.string,
+            vol.Required(CONF_MQTT_HOST): cv.string,
+            vol.Optional(CONF_MQTT_USERNAME): cv.string,
+            vol.Optional(CONF_MQTT_PASSWORD): cv.string,
+        })
+    )
+    
     # Start the manager
     if entry.data.get(CONF_SERVICE_ENABLED, True):
         await manager.start()
@@ -121,7 +333,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     # Stop the manager
-    manager = hass.data[DOMAIN][entry.entry_id]["manager"]
+    manager = hass.data[DOMAIN][entry.entry_id][DATA_MANAGER]
     await manager.stop()
     
     # Unload the platforms
