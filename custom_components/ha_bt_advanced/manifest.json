@@ -3,12 +3,11 @@
   "name": "HA-BT-Advanced",
   "codeowners": ["@piwi3910"],
   "config_flow": true,
-  "dependencies": ["mqtt"],
+  "dependencies": ["mqtt", "http"],
   "documentation": "https://github.com/piwi3910/HA-BT-advanced",
   "issue_tracker": "https://github.com/piwi3910/HA-BT-advanced/issues",
   "integration_type": "device",
   "iot_class": "local_push",
   "requirements": ["pyyaml>=6.0"],
-  "version": "0.1.0",
-  "minimum_ha_version": "2023.5.0"
+  "version": "0.1.0"
 }

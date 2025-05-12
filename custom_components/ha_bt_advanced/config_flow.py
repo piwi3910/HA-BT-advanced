@@ -211,6 +211,8 @@ class HABTAdvancedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
     """Handle HA-BT-Advanced options."""
 
+    DOMAIN = DOMAIN
+
     def __init__(self, config_entry):
         """Initialize options flow."""
         self.config_entry = config_entry

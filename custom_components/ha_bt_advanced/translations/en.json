@@ -43,27 +43,39 @@
       "signal_strength": {
         "name": "Signal Strength",
         "state_attributes": {
-          "proxy_id": "Proxy ID"
+          "proxy_id": {
+            "name": "Proxy ID"
+          }
         }
       },
       "distance": {
         "name": "Distance",
         "state_attributes": {
-          "proxy_id": "Proxy ID"
+          "proxy_id": {
+            "name": "Proxy ID"
+          }
         }
       },
       "accuracy": {
         "name": "Accuracy",
         "state_attributes": {
-          "num_proxies": "Number of Proxies",
-          "contributing_proxies": "Contributing Proxies"
+          "num_proxies": {
+            "name": "Number of Proxies"
+          },
+          "contributing_proxies": {
+            "name": "Contributing Proxies"
+          }
         }
       },
       "zone": {
         "name": "Zone",
         "state_attributes": {
-          "zone_id": "Zone ID",
-          "zone_type": "Zone Type"
+          "zone_id": {
+            "name": "Zone ID"
+          },
+          "zone_type": {
+            "name": "Zone Type"
+          }
         }
       }
     },
@@ -71,21 +83,31 @@
       "presence": {
         "name": "Presence",
         "state_attributes": {
-          "last_seen": "Last Seen"
+          "last_seen": {
+            "name": "Last Seen"
+          }
         }
       },
       "zone_presence": {
         "name": "Zone Presence",
         "state_attributes": {
-          "zone_id": "Zone ID",
-          "zone_name": "Zone Name"
+          "zone_id": {
+            "name": "Zone ID"
+          },
+          "zone_name": {
+            "name": "Zone Name"
+          }
         }
       },
       "proxy_connectivity": {
         "name": "Proxy Connectivity",
         "state_attributes": {
-          "proxy_id": "Proxy ID",
-          "last_seen": "Last Seen"
+          "proxy_id": {
+            "name": "Proxy ID"
+          },
+          "last_seen": {
+            "name": "Last Seen"
+          }
         }
       }
     }
