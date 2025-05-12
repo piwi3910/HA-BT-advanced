@@ -51,18 +51,36 @@ The following issues have been fixed:
 4. **Fixed translations format**
    - Ensured state_attributes uses the proper dictionary format
 
-## Remaining GitHub-Specific Requirements
+## GitHub Repository Requirements
 
-For the GitHub repository to pass HACS validation, you'll need to complete these steps:
+For the GitHub repository to pass HACS validation, you must complete these steps (these cannot be done through code changes alone):
 
-1. **Add Repository Description and Topics:**
-   - Go to the GitHub repository settings
-   - Add a description that clearly explains what the integration does
-   - Add topics like: home-assistant, integration, hacs, bluetooth, triangulation, tracking
+1. **Add Repository Description:** (Required)
+   - Go to your GitHub repository page
+   - Click the "Settings" tab
+   - Add a descriptive summary in the "Description" field
+   - Example: "BLE iBeacon Triangulation with ESPHome Proxies for Home Assistant"
 
-2. **Add Home Assistant Brands (optional):**
-   - For official icon in Home Assistant, submit your integration to the Home Assistant brands repository
-   - More information: https://developers.home-assistant.io/docs/creating_integration_manifest#logo
+2. **Add Repository Topics:** (Required)
+   - Still in the Settings tab of your repository
+   - Find the "Topics" section
+   - Add relevant topics (at least 8 recommended):
+     - home-assistant
+     - homeassistant
+     - hacs
+     - custom-integration
+     - bluetooth
+     - ble
+     - triangulation
+     - esphome
+     - ibeacon
+     - location-tracking
+
+3. **Add to Home Assistant Brands Repository:** (Optional)
+   - This gives your integration an official icon in Home Assistant
+   - Submit a pull request to: https://github.com/home-assistant/brands
+   - Follow the guidelines at: https://developers.home-assistant.io/docs/creating_integration_manifest#logo
+   - Note: This is optional but recommended for a professional appearance
 
 3. **Add GitHub Workflow:**
    - We've created the necessary .github/workflows directory

@@ -193,3 +193,17 @@ For more details, see [VALIDATION.md](VALIDATION.md).
 ## Author
 
 Pascal Watteel (pascal@watteel.com)
+
+## Repository Notes
+
+For developers and maintainers:
+
+1. Please ensure this repository has:
+   - A descriptive GitHub repository description
+   - Appropriate topics (home-assistant, homeassistant, hacs, bluetooth, etc.)
+   - Proper validation setup (see VALIDATION.md)
+
+2. Run local validation before pushing changes:
+   ```bash
+   ./tools/validate.sh
+   ```

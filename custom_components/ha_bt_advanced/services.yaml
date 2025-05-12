@@ -93,22 +93,14 @@ add_proxy:
       required: true
       example: 37.7749
       selector:
-        number:
-          min: -90
-          max: 90
-          mode: box
-          step: 0.0000001
+        text:
     longitude:
       name: Longitude
       description: The longitude of the proxy location.
       required: true
       example: -122.4194
       selector:
-        number:
-          min: -180
-          max: 180
-          mode: box
-          step: 0.0000001
+        text:
 
 remove_proxy:
   name: Remove Proxy
