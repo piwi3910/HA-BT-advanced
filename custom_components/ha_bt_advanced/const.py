@@ -23,12 +23,6 @@ CONF_ZONE_ID = "zone_id"
 CONF_ZONE_NAME = "zone_name"
 CONF_ZONE_TYPE = "zone_type"
 CONF_ZONE_COORDINATES = "coordinates"
-CONF_WIFI_SSID = "wifi_ssid"
-CONF_WIFI_PASSWORD = "wifi_password"
-CONF_MQTT_HOST = "mqtt_host"
-CONF_MQTT_USERNAME = "mqtt_username"
-CONF_MQTT_PASSWORD = "mqtt_password"
-CONF_FALLBACK_PASSWORD = "fallback_password"
 
 # Beacon categories
 BEACON_CATEGORY_PERSON = "person"
@@ -85,7 +79,6 @@ SERVICE_REMOVE_PROXY = "remove_proxy"
 SERVICE_ADD_ZONE = "add_zone"
 SERVICE_REMOVE_ZONE = "remove_zone"
 SERVICE_CALIBRATE = "calibrate"
-SERVICE_GENERATE_ESPHOME = "generate_esphome_config"
 
 # Signal attributes
 ATTR_RSSI = "rssi"

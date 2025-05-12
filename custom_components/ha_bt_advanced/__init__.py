@@ -54,7 +54,6 @@ from .const import (
     SERVICE_ADD_ZONE,
     SERVICE_REMOVE_ZONE,
     SERVICE_CALIBRATE,
-    SERVICE_GENERATE_ESPHOME,
     BEACON_CATEGORY_PERSON,
     BEACON_CATEGORY_ITEM,
     BEACON_CATEGORY_PET,
@@ -66,7 +65,7 @@ import homeassistant.helpers.entity_component
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.DEVICE_TRACKER, Platform.SENSOR, Platform.BINARY_SENSOR, Platform.CONFIG]
+PLATFORMS = [Platform.DEVICE_TRACKER, Platform.SENSOR, Platform.BINARY_SENSOR]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -258,71 +257,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         })
     )
 
-    async def handle_generate_esphome_config(call: ServiceCall) -> None:
-        """Handle the generate_esphome_config service call."""
-        from .esphome_wizard import generate_esphome_config, create_esphome_secrets, save_esphome_config
-
-        proxy_id = call.data.get(CONF_PROXY_ID)
-        wifi_ssid = call.data.get(CONF_WIFI_SSID)
-        wifi_password = call.data.get(CONF_WIFI_PASSWORD)
-        fallback_password = call.data.get(CONF_FALLBACK_PASSWORD)
-        mqtt_host = call.data.get(CONF_MQTT_HOST)
-        mqtt_username = call.data.get(CONF_MQTT_USERNAME, "")
-        mqtt_password = call.data.get(CONF_MQTT_PASSWORD, "")
-
-        try:
-            # Prepare MQTT config
-            mqtt_config = {
-                "broker": mqtt_host,
-                "username": mqtt_username,
-                "password": mqtt_password,
-            }
-
-            # Generate configuration
-            config = generate_esphome_config(
-                proxy_id=proxy_id,
-                mqtt_config=mqtt_config,
-                mqtt_topic_prefix=manager.mqtt_topic_prefix
-            )
-
-            # Create output directory
-            config_dir = hass.config.path(f"esphome/{DOMAIN}")
-
-            # Save configuration and secrets
-            config_path = save_esphome_config(proxy_id, config, config_dir)
-            secrets_path = create_esphome_secrets(
-                config_dir,
-                wifi_ssid,
-                wifi_password,
-                fallback_password
-            )
-
-            _LOGGER.info(f"Generated ESPHome configuration for {proxy_id} at {config_path}")
-
-            # Return the configuration content to the caller
-            return {
-                "config_path": config_path,
-                "secrets_path": secrets_path,
-                "config_content": config,
-            }
-        except Exception as e:
-            _LOGGER.error(f"Error generating ESPHome configuration: {e}")
-            raise
-
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_GENERATE_ESPHOME,
-        handle_generate_esphome_config,
-        schema=vol.Schema({
-            vol.Required(CONF_PROXY_ID): cv.string,
-            vol.Required(CONF_WIFI_SSID): cv.string,
-            vol.Required(CONF_WIFI_PASSWORD): cv.string,
-            vol.Required(CONF_FALLBACK_PASSWORD): cv.string,
-            vol.Required(CONF_MQTT_HOST): cv.string,
-            vol.Optional(CONF_MQTT_USERNAME): cv.string,
-            vol.Optional(CONF_MQTT_PASSWORD): cv.string,
-        })
-    )
+    # ESPHome configuration is now handled via example YAML files
+    # See the README.md and esphome_ble_proxy.yaml for more information
     
     # Start the manager
     if entry.data.get(CONF_SERVICE_ENABLED, True):

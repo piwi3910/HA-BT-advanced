@@ -91,12 +91,11 @@ Define custom zones on the map to track beacon presence:
 
 ### ESPHome Configuration
 
-Generate and download ESPHome configuration for your ESP32 proxies:
+For ESPHome configuration, use the example YAML file provided in the repository:
 
-- Automatically generate YAML configuration
-- Pre-configured MQTT settings for instant connection
-- Easy setup with WiFi and broker credentials
-- Download and flash directly to your ESP32 devices
+- Copy the `esphome_ble_proxy.yaml` file from the repository
+- Modify it with your WiFi and MQTT credentials
+- Flash it to your ESP32 devices using ESPHome
 
 ## Home Assistant Entities
 
@@ -144,7 +143,6 @@ The integration provides several services for automation:
 - **add_zone**: Add a new zone for location tracking
 - **remove_zone**: Remove a zone from the system
 - **calibrate**: Calibrate a beacon with new signal parameters
-- **generate_esphome_config**: Generate an ESPHome configuration for a proxy
 
 ## Troubleshooting
 
