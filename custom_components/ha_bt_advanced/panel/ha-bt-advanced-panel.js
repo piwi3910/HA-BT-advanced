@@ -29,6 +29,8 @@ class HABTAdvancedPanel extends HTMLElement {
   async waitForLeaflet() {
     // If Leaflet is already loaded, return immediately
     if (window.L) {
+      // Also inject Leaflet CSS into shadow DOM
+      this.injectLeafletStyles();
       return;
     }
 
@@ -37,6 +39,8 @@ class HABTAdvancedPanel extends HTMLElement {
       const checkInterval = setInterval(() => {
         if (window.L) {
           clearInterval(checkInterval);
+          // Inject Leaflet CSS into shadow DOM
+          this.injectLeafletStyles();
           resolve();
         }
       }, 100);
@@ -48,6 +52,14 @@ class HABTAdvancedPanel extends HTMLElement {
         resolve(); // Resolve anyway to prevent hanging
       }, 10000);
     });
+  }
+
+  injectLeafletStyles() {
+    // Inject Leaflet CSS directly into shadow DOM
+    const leafletCSS = document.createElement('link');
+    leafletCSS.rel = 'stylesheet';
+    leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    this.shadowRoot.appendChild(leafletCSS);
   }
 
   render() {
@@ -77,8 +89,6 @@ class HABTAdvancedPanel extends HTMLElement {
           width: 100%;
           height: 100%;
         }
-        /* Leaflet styles for shadow DOM */
-        @import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
         .toolbar {
           position: absolute;
           top: 10px;
@@ -398,6 +408,19 @@ class HABTAdvancedPanel extends HTMLElement {
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(this.map);
+
+      // Force map to recalculate its size (fixes tiling issues)
+      setTimeout(() => {
+        this.map.invalidateSize();
+      }, 100);
+
+      // Add resize observer to handle container size changes
+      const resizeObserver = new ResizeObserver(() => {
+        if (this.map) {
+          this.map.invalidateSize();
+        }
+      });
+      resizeObserver.observe(mapElement);
 
     // Add home marker
     L.marker(homeLocation, {
