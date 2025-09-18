@@ -1,42 +1,46 @@
 substitutions:
   proxy_id: kitchen_proxy  # Change this for each ESP32 device
-  name: "${proxy_id}"
-  friendly_name: "${proxy_id} BLE Proxy"
+  device_name: ble-proxy-${proxy_id}
+  friendly_name: "BLE Proxy ${proxy_id}"
+  mqtt_topic_prefix: "ble-triangulation"
 
 esphome:
-  name: "${name}"
+  name: "${device_name}"
   friendly_name: "${friendly_name}"
-
-esp32:
+  platform: ESP32
   board: esp32dev
-  framework:
-    type: arduino
 
 # Enable logging
 logger:
+  level: INFO
 
-# Enable Home Assistant API
+# Enable Home Assistant API (optional - comment out if using MQTT only)
 api:
+  reboot_timeout: 0s  # Disable reboot if no API connection
 
 # Enable OTA updates
 ota:
+  password: !secret ota_password
 
 # Enable WiFi
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  
+
   # Enable fallback hotspot in case of connection failure
   ap:
-    ssid: "${name} Fallback Hotspot"
+    ssid: "${friendly_name} Fallback"
     password: !secret fallback_ap_password
 
 # Enable MQTT for proxying BLE data
 mqtt:
+  id: mqtt_client
   broker: !secret mqtt_broker
   username: !secret mqtt_username
   password: !secret mqtt_password
-  client_id: "${name}"
+  client_id: "${device_name}"
+  discovery: true
+  discovery_prefix: homeassistant
 
 # Enable BLE tracking
 esp32_ble_tracker:
@@ -44,40 +48,80 @@ esp32_ble_tracker:
     interval: 1100ms
     window: 1100ms
     active: false
+    continuous: true
+  on_ble_advertise:
+    - then:
+        - lambda: |-
+            // Only process iBeacon advertisements
+            if (x.get_ibeacon().has_value()) {
+              auto ibeacon = x.get_ibeacon().value();
+
+              // Format MAC address
+              char mac_address[18];
+              sprintf(mac_address, "%02X:%02X:%02X:%02X:%02X:%02X",
+                      x.address[0], x.address[1], x.address[2],
+                      x.address[3], x.address[4], x.address[5]);
+
+              // Get current time
+              auto time = id(homeassistant_time).now();
+              char time_str[25];
+              strftime(time_str, sizeof(time_str), "%Y-%m-%dT%H:%M:%SZ", time.to_c_tm());
+
+              // Create JSON payload
+              std::string payload = "{";
+              payload += "\"proxy_id\":\"${proxy_id}\",";
+              payload += "\"beacon_mac\":\"" + std::string(mac_address) + "\",";
+              payload += "\"rssi\":" + std::to_string(x.get_rssi()) + ",";
+              payload += "\"uuid\":\"" + ibeacon.get_uuid().to_string() + "\",";
+              payload += "\"major\":" + std::to_string(ibeacon.get_major()) + ",";
+              payload += "\"minor\":" + std::to_string(ibeacon.get_minor()) + ",";
+              payload += "\"tx_power\":" + std::to_string(ibeacon.get_signal_power()) + ",";
+              payload += "\"timestamp\":\"" + std::string(time_str) + "\"";
+              payload += "}";
+
+              // Publish to MQTT
+              id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+
+              // Optional: Log for debugging
+              ESP_LOGD("ble_tracker", "Published iBeacon: %s", payload.c_str());
+            }
 
 # Time component to provide accurate timestamps
 time:
   - platform: homeassistant
     id: homeassistant_time
 
-# Custom BLE scanner component
-ibeacon:
-  - id: ble_scanner
-    on_ibeacon:
-      then:
-        - mqtt.publish:
-            topic: "ble-triangulation/${proxy_id}"
-            payload: |-
-              {
-                "proxy_id": "${proxy_id}",
-                "beacon_mac": "{{ format('%02X:%02X:%02X:%02X:%02X:%02X', 
-                                   x.address[0], x.address[1], x.address[2], 
-                                   x.address[3], x.address[4], x.address[5]) }}",
-                "rssi": {{ x.rssi }},
-                "timestamp": "{{ now().strftime('%Y-%m-%dT%H:%M:%SZ') }}"
-              }
-
-# Sensor to monitor system health
+# Sensors to monitor system health
 sensor:
   - platform: wifi_signal
-    name: "${name} WiFi Signal"
+    name: "${friendly_name} WiFi Signal"
     update_interval: 60s
-    
+
   - platform: uptime
-    name: "${name} Uptime"
+    name: "${friendly_name} Uptime"
     update_interval: 60s
-    
-  - platform: internal_temperature
-    name: "${name} Temperature"
-    id: internal_temperature
-    update_interval: 60s
+    unit_of_measurement: seconds
+
+  # Only include if your ESP32 supports internal temperature
+  # - platform: internal_temperature
+  #   name: "${friendly_name} Temperature"
+  #   update_interval: 60s
+
+# Binary sensor for connection status
+binary_sensor:
+  - platform: status
+    name: "${friendly_name} Status"
+
+# Text sensor to report the proxy ID for easier identification
+text_sensor:
+  - platform: template
+    name: "${friendly_name} Proxy ID"
+    lambda: |-
+      return {"${proxy_id}"};
+    update_interval: never
+    icon: "mdi:identifier"
+
+# Switch to restart the ESP32
+switch:
+  - platform: restart
+    name: "${friendly_name} Restart"
