@@ -231,6 +231,8 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_beacons()
             elif next_step == "proxies":
                 return await self.async_step_proxies()
+            elif next_step == "calibration":
+                return await self.async_step_calibration()
             elif next_step == "discovery":
                 return await self.async_step_discovery()
             elif next_step == "signal_parameters":
@@ -242,6 +244,7 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
                 vol.Required("menu_option", default="beacons"): vol.In({
                     "beacons": "Manage Beacons",
                     "proxies": "View Proxies",
+                    "calibration": "Proxy Calibration",
                     "discovery": "Discover New Beacons",
                     "signal_parameters": "Signal Parameters",
                 })
@@ -367,6 +370,130 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
             }
         )
 
+    async def async_step_calibration(self, user_input=None):
+        """Proxy calibration step."""
+        errors = {}
+
+        # Get manager
+        manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get("manager")
+        if not manager:
+            manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
+
+        # Get list of proxies for selection
+        proxy_options = {}
+        if manager and hasattr(manager, 'proxies'):
+            for proxy_id in manager.proxies.keys():
+                proxy_options[proxy_id] = proxy_id
+
+        if not proxy_options:
+            # No proxies available
+            return self.async_show_form(
+                step_id="calibration",
+                data_schema=vol.Schema({}),
+                errors={"base": "no_proxies"},
+                description_placeholders={
+                    "info": "No proxies detected. Proxies will be auto-detected when they send MQTT data."
+                }
+            )
+
+        if user_input is not None:
+            if user_input.get("start_calibration"):
+                # Start calibration for selected proxy
+                proxy_id = user_input.get("proxy_to_calibrate")
+                reference_distance = user_input.get("reference_distance", 1.0)
+                duration = user_input.get("duration", 30)
+
+                if proxy_id and manager:
+                    success = await manager.start_proxy_calibration(
+                        proxy_id=proxy_id,
+                        reference_distance=reference_distance,
+                        duration=duration
+                    )
+                    if success:
+                        return self.async_show_progress_done(next_step_id="calibration_started")
+                    else:
+                        errors["base"] = "calibration_failed"
+
+            elif user_input.get("view_results"):
+                # View calibration results for selected proxy
+                proxy_id = user_input.get("proxy_to_view")
+                if proxy_id and manager:
+                    results = manager.get_calibration_results(proxy_id)
+                    if results:
+                        return await self.async_step_calibration_results({"proxy_id": proxy_id, "results": results})
+                    else:
+                        errors["base"] = "no_results"
+
+            elif user_input.get("back_to_menu"):
+                return await self.async_step_init()
+
+        # Show calibration form
+        return self.async_show_form(
+            step_id="calibration",
+            data_schema=vol.Schema({
+                vol.Optional("proxy_to_calibrate"): vol.In(proxy_options),
+                vol.Optional("reference_distance", default=1.0): vol.All(
+                    vol.Coerce(float), vol.Range(min=0.5, max=10.0)
+                ),
+                vol.Optional("duration", default=30): vol.All(
+                    vol.Coerce(int), vol.Range(min=10, max=120)
+                ),
+                vol.Optional("start_calibration", default=False): cv.boolean,
+                vol.Optional("proxy_to_view"): vol.In(proxy_options),
+                vol.Optional("view_results", default=False): cv.boolean,
+                vol.Optional("back_to_menu", default=False): cv.boolean,
+            }),
+            errors=errors,
+            description_placeholders={
+                "info": (
+                    "Calibration helps determine optimal signal parameters for your environment.\n\n"
+                    "To calibrate:\n"
+                    "1. Select a proxy and set the reference distance\n"
+                    "2. Place a beacon at that exact distance from the proxy\n"
+                    "3. Start calibration and wait for completion\n"
+                    "4. View results to see calculated TX power"
+                )
+            }
+        )
+
+    async def async_step_calibration_results(self, context):
+        """Show calibration results."""
+        proxy_id = context.get("proxy_id")
+        results = context.get("results")
+
+        info_text = (
+            f"**Calibration Results for {proxy_id}**\n\n"
+            f"• TX Power at 1m: {results['tx_power']} dBm\n"
+            f"• Average RSSI: {results['avg_rssi']} dBm\n"
+            f"• Standard Deviation: {results['std_dev']} dBm\n"
+            f"• Samples Collected: {results['sample_count']}\n"
+            f"• Reference Distance: {results['reference_distance']} m\n\n"
+            f"**Recommendation:**\n"
+            f"Update Signal Parameters with TX Power = {results['tx_power']} dBm"
+        )
+
+        return self.async_show_form(
+            step_id="calibration_results",
+            data_schema=vol.Schema({
+                vol.Optional("back_to_calibration", default=True): cv.boolean,
+            }),
+            description_placeholders={
+                "info": info_text
+            }
+        )
+
+    async def async_step_calibration_started(self, user_input=None):
+        """Calibration started notification."""
+        return self.async_show_form(
+            step_id="calibration_started",
+            data_schema=vol.Schema({
+                vol.Optional("back_to_calibration", default=True): cv.boolean,
+            }),
+            description_placeholders={
+                "info": "Calibration has started! Check notifications for progress and results."
+            }
+        )
+
     async def async_step_discovery(self, user_input=None):
         """Start beacon discovery mode."""
         errors = {}
@@ -440,8 +567,7 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
             }),
             errors=errors,
             description_placeholders={
-                "beacon_count": str(len(discovered_options)),
-                "info": f"Found {len(discovered_options)} beacon(s)"
+                "info": f"Found {len(discovered_options)} new beacon(s). Select one to onboard:"
             }
         )
 

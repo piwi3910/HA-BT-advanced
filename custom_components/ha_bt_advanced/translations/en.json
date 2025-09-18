@@ -50,6 +50,33 @@
         "description": "Detected {proxy_count} proxy(ies)\n\n{proxy_list}\n\n{info}",
         "data": {}
       },
+      "calibration": {
+        "title": "Proxy Calibration",
+        "description": "{info}",
+        "data": {
+          "proxy_to_calibrate": "Select proxy to calibrate",
+          "reference_distance": "Reference distance (meters)",
+          "duration": "Calibration duration (seconds)",
+          "start_calibration": "Start calibration",
+          "proxy_to_view": "Select proxy to view results",
+          "view_results": "View calibration results",
+          "back_to_menu": "Back to menu"
+        }
+      },
+      "calibration_results": {
+        "title": "Calibration Results",
+        "description": "{info}",
+        "data": {
+          "back_to_calibration": "Back to calibration"
+        }
+      },
+      "calibration_started": {
+        "title": "Calibration Started",
+        "description": "{info}",
+        "data": {
+          "back_to_calibration": "Back to calibration"
+        }
+      },
       "discovery": {
         "title": "Beacon Discovery",
         "description": "{info}",

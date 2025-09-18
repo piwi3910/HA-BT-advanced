@@ -99,6 +99,19 @@ ha core restart
    - Manages proxy and beacon configuration
    - Implements custom configuration UI panel
 
+## Critical Design Requirements
+
+**GUI-ONLY CONFIGURATION**: ALL configuration and management MUST be done through the integration's GUI config flow. NEVER require users to:
+- Use Developer Tools > Services to call services manually
+- Edit YAML files manually
+- Use the command line
+- Access any other part of Home Assistant outside the integration settings
+
+Everything must be accessible through:
+Settings > Devices & Services > HA-BT-Advanced > Configure
+
+All features including calibration, beacon management, proxy management, and zone configuration must be available in the GUI options flow.
+
 ## Important Implementation Notes
 
 1. The triangulation algorithm in `Triangulator` class handles both 2-point (bilateration) and 3+ point (multilateration) cases
