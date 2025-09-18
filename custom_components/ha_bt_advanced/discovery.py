@@ -127,11 +127,15 @@ class DiscoveryManager:
 
         # Always process onboarded beacons
         if self.is_beacon_onboarded(mac):
+            _LOGGER.debug(f"Beacon {mac_upper} is onboarded, will process normally")
             return True
 
         # In discovery mode, apply filters
         if not self.discovery_mode:
+            _LOGGER.debug(f"Beacon {mac_upper} not onboarded and not in discovery mode, ignoring")
             return False
+
+        _LOGGER.debug(f"In discovery mode, checking filters for {mac_upper}")
 
         # Check if discovery has expired
         if self.discovery_end_time and time.time() > self.discovery_end_time:
@@ -155,10 +159,13 @@ class DiscoveryManager:
     def process_discovery_beacon(self, mac: str, rssi: int, beacon_data: Dict[str, Any], proxy_id: str) -> None:
         """Process a beacon in discovery mode."""
         if not self.discovery_mode:
+            _LOGGER.debug(f"Not in discovery mode, ignoring beacon {mac}")
             return
 
         mac_upper = mac.upper()
         current_time = time.time()
+
+        _LOGGER.info(f"Processing discovery beacon: {mac_upper}, RSSI: {rssi}, Proxy: {proxy_id}")
 
         if mac_upper not in self.discovered_beacons:
             self.discovered_beacons[mac_upper] = {
@@ -177,6 +184,11 @@ class DiscoveryManager:
         beacon_info['rssi_values'].append(rssi)
         beacon_info['proxies'].add(proxy_id)
 
+        _LOGGER.info(
+            f"Discovery beacon {mac_upper}: count={beacon_info['count']}, "
+            f"RSSI={rssi}, proxies={len(beacon_info['proxies'])}"
+        )
+
         # Keep only last 10 RSSI values for averaging
         if len(beacon_info['rssi_values']) > 10:
             beacon_info['rssi_values'] = beacon_info['rssi_values'][-10:]
@@ -189,13 +201,18 @@ class DiscoveryManager:
         current_time = time.time()
         eligible_beacons = []
 
+        _LOGGER.info(f"Getting discovered beacons: total={len(self.discovered_beacons)}, min_count={min_count}")
+
         for mac, info in self.discovered_beacons.items():
             # Skip if not enough detections
             if info['count'] < min_count:
+                _LOGGER.debug(f"Beacon {mac} has count={info['count']} < {min_count}, skipping")
                 continue
 
             # Skip if not seen recently (within last 10 seconds)
-            if current_time - info['last_seen'] > 10:
+            time_since_seen = current_time - info['last_seen']
+            if time_since_seen > 10:
+                _LOGGER.debug(f"Beacon {mac} last seen {time_since_seen:.1f}s ago, skipping")
                 continue
 
             # Calculate average RSSI
