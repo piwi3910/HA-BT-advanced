@@ -215,7 +215,7 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry):
         """Initialize options flow."""
-        self.config_entry = config_entry
+        # config_entry is automatically set by Home Assistant, no need to assign explicitly
         self.options = dict(config_entry.options)
         self.config_data = dict(config_entry.data)
 

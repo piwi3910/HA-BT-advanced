@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
@@ -130,10 +130,10 @@ class TriangulationManager:
         
         # Schedule periodic cleanup and status check
         self._cleanup_interval = async_track_time_interval(
-            hass, self._clean_old_readings, dt_util.timedelta(seconds=60)
+            hass, self._clean_old_readings, timedelta(seconds=60)
         )
         self._status_check_interval = async_track_time_interval(
-            hass, self._check_devices_status, dt_util.timedelta(seconds=300)
+            hass, self._check_devices_status, timedelta(seconds=300)
         )
 
     def _initialize_trackers(self) -> None:
