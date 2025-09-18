@@ -223,14 +223,31 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         """Manage the options menu."""
-        return self.async_show_menu(
+        if user_input is not None:
+            # Navigate to selected option
+            next_step = user_input.get("menu_option")
+            if next_step == "beacons":
+                return await self.async_step_beacons()
+            elif next_step == "proxies":
+                return await self.async_step_proxies()
+            elif next_step == "discovery":
+                return await self.async_step_discovery()
+            elif next_step == "signal_parameters":
+                return await self.async_step_signal_parameters()
+
+        return self.async_show_form(
             step_id="init",
-            menu_options=[
-                "beacons",
-                "proxies",
-                "discovery",
-                "signal_parameters",
-            ]
+            data_schema=vol.Schema({
+                vol.Required("menu_option", default="beacons"): vol.In({
+                    "beacons": "Manage Beacons",
+                    "proxies": "View Proxies",
+                    "discovery": "Discover New Beacons",
+                    "signal_parameters": "Signal Parameters",
+                })
+            }),
+            description_placeholders={
+                "info": "Select an option to configure"
+            }
         )
 
     async def async_step_beacons(self, user_input=None):
@@ -243,6 +260,8 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
             elif user_input.get("beacon_to_delete"):
                 self._beacon_to_delete = user_input["beacon_to_delete"]
                 return await self.async_step_confirm_delete_beacon()
+            elif user_input.get("back_to_menu"):
+                return await self.async_step_init()
 
         # Get current beacons from manager
         manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get("manager")
@@ -265,6 +284,7 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
 
         schema = vol.Schema({
             vol.Optional("add_beacon", default=False): bool,
+            vol.Optional("back_to_menu", default=False): bool,
         })
 
         if beacon_options:

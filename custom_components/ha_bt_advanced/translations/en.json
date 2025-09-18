@@ -24,12 +24,9 @@
     "step": {
       "init": {
         "title": "HA-BT-Advanced Configuration",
-        "description": "Manage beacons, proxies and signal parameters",
-        "menu_options": {
-          "beacons": "Manage Beacons",
-          "proxies": "View Proxies",
-          "discovery": "Discover New Beacons",
-          "signal_parameters": "Signal Parameters"
+        "description": "{info}",
+        "data": {
+          "menu_option": "Select Option"
         }
       },
       "beacons": {
@@ -37,7 +34,8 @@
         "description": "Currently tracking {beacon_count} beacon(s)\n\n{beacon_list}",
         "data": {
           "add_beacon": "Add new beacon (start discovery)",
-          "beacon_to_delete": "Select beacon to delete"
+          "beacon_to_delete": "Select beacon to delete",
+          "back_to_menu": "Back to menu"
         }
       },
       "confirm_delete_beacon": {
