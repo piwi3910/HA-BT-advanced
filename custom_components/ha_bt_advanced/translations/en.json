@@ -49,13 +49,6 @@
           "back_to_menu": "Back to menu"
         }
       },
-      "confirm_delete_beacon": {
-        "title": "Delete Beacon",
-        "description": "Are you sure you want to delete beacon {beacon_mac}? This will stop tracking this beacon.",
-        "data": {
-          "confirm": "Confirm deletion"
-        }
-      },
       "proxies": {
         "title": "Manage Proxies",
         "description": "{info}",
