@@ -1,0 +1,104 @@
+substitutions:
+  name: olimex-esp32-poe-iso-ad1678
+  friendly_name: "Bluetooth Proxy ad1678"
+  proxy_id: olimex_ad1678  # Unique ID for triangulation
+  mqtt_topic_prefix: "ble-triangulation"
+
+packages:
+  # Use the official Olimex ESP32-POE-ISO Bluetooth Proxy package as base
+  esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/olimex/olimex-esp32-poe-iso.yaml@main
+
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+
+# Override/extend the API configuration
+api:
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: 0s  # Disable reboot if no API connection when using MQTT
+
+# Add MQTT for BLE triangulation data
+mqtt:
+  id: mqtt_client
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  client_id: "${name}"
+  discovery: true
+  discovery_prefix: homeassistant
+
+# Extend the BLE tracker with our custom triangulation logic
+# The base package already includes esp32_ble_tracker, we just add our handler
+esp32_ble_tracker:
+  on_ble_advertise:
+    - then:
+        - lambda: |-
+            // Only process iBeacon advertisements for triangulation
+            if (x.get_ibeacon().has_value()) {
+              auto ibeacon = x.get_ibeacon().value();
+
+              // Format MAC address
+              char mac_address[18];
+              sprintf(mac_address, "%02X:%02X:%02X:%02X:%02X:%02X",
+                      x.address[0], x.address[1], x.address[2],
+                      x.address[3], x.address[4], x.address[5]);
+
+              // Get current time
+              auto time = id(homeassistant_time).now();
+              char time_str[25];
+              strftime(time_str, sizeof(time_str), "%Y-%m-%dT%H:%M:%SZ", time.to_c_tm());
+
+              // Create JSON payload for triangulation
+              std::string payload = "{";
+              payload += "\"proxy_id\":\"${proxy_id}\",";
+              payload += "\"beacon_mac\":\"" + std::string(mac_address) + "\",";
+              payload += "\"rssi\":" + std::to_string(x.get_rssi()) + ",";
+              payload += "\"uuid\":\"" + ibeacon.get_uuid().to_string() + "\",";
+              payload += "\"major\":" + std::to_string(ibeacon.get_major()) + ",";
+              payload += "\"minor\":" + std::to_string(ibeacon.get_minor()) + ",";
+              payload += "\"tx_power\":" + std::to_string(ibeacon.get_signal_power()) + ",";
+              payload += "\"timestamp\":\"" + std::string(time_str) + "\"";
+              payload += "}";
+
+              // Publish to MQTT for triangulation
+              id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+
+              // Optional: Log for debugging
+              ESP_LOGD("ble_triangulation", "Published iBeacon: %s", payload.c_str());
+            }
+
+# Time component (might already be in base package, but safe to re-declare)
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+# Additional sensors for triangulation monitoring
+sensor:
+  # Add a sensor to track number of beacons detected
+  - platform: template
+    name: "${friendly_name} Beacons Detected"
+    id: beacons_detected_count
+    update_interval: 30s
+    unit_of_measurement: "beacons"
+    accuracy_decimals: 0
+    icon: "mdi:bluetooth"
+
+# Text sensor to report the proxy ID for triangulation system
+text_sensor:
+  - platform: template
+    name: "${friendly_name} Proxy ID"
+    lambda: |-
+      return {"${proxy_id}"};
+    update_interval: never
+    icon: "mdi:identifier"
+
+# Optional: Override Ethernet settings if needed for Olimex
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO17_OUT
+  phy_addr: 0
+  power_pin: GPIO12

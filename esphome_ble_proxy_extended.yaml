@@ -1,0 +1,136 @@
+# Extended BLE Proxy Configuration for Triangulation
+# This configuration extends any official ESPHome Bluetooth Proxy package
+# with BLE triangulation capabilities
+
+substitutions:
+  # Modify these for your device
+  name: your-device-name
+  friendly_name: "Your Device Friendly Name"
+  proxy_id: your_proxy_id  # Unique ID for triangulation (e.g., living_room, kitchen)
+  mqtt_topic_prefix: "ble-triangulation"
+
+packages:
+  # Choose your base package based on your hardware:
+
+  # For Generic ESP32:
+  # esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/esp32-generic.yaml@main
+
+  # For Olimex ESP32-POE-ISO:
+  # esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/olimex/olimex-esp32-poe-iso.yaml@main
+
+  # For Olimex ESP32-POE:
+  # esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/olimex/olimex-esp32-poe.yaml@main
+
+  # For M5Stack Atom Lite:
+  # esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/m5stack-atom-lite.yaml@main
+
+  # For M5Stack Atom Echo:
+  # esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/m5stack-atom-echo.yaml@main
+
+  # For ESP32-C3:
+  # esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/esp32-c3.yaml@main
+
+  # For Shelly Plus Devices:
+  # esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/shelly-plus.yaml@main
+
+  # For GL.iNet GL-S10:
+  # esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/gl-s10.yaml@main
+
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+
+# API configuration (if not using from package)
+api:
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: 0s  # Disable reboot when using MQTT
+
+# Add MQTT for BLE triangulation data
+mqtt:
+  id: mqtt_client
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  client_id: "${name}"
+  discovery: true
+  discovery_prefix: homeassistant
+
+# Extend the BLE tracker with triangulation logic
+esp32_ble_tracker:
+  on_ble_advertise:
+    - then:
+        - lambda: |-
+            // Process iBeacon advertisements for triangulation
+            if (x.get_ibeacon().has_value()) {
+              auto ibeacon = x.get_ibeacon().value();
+
+              // Format MAC address
+              char mac_address[18];
+              sprintf(mac_address, "%02X:%02X:%02X:%02X:%02X:%02X",
+                      x.address[0], x.address[1], x.address[2],
+                      x.address[3], x.address[4], x.address[5]);
+
+              // Get current time
+              auto time = id(homeassistant_time).now();
+              char time_str[25];
+              strftime(time_str, sizeof(time_str), "%Y-%m-%dT%H:%M:%SZ", time.to_c_tm());
+
+              // Create JSON payload
+              std::string payload = "{";
+              payload += "\"proxy_id\":\"${proxy_id}\",";
+              payload += "\"beacon_mac\":\"" + std::string(mac_address) + "\",";
+              payload += "\"rssi\":" + std::to_string(x.get_rssi()) + ",";
+              payload += "\"uuid\":\"" + ibeacon.get_uuid().to_string() + "\",";
+              payload += "\"major\":" + std::to_string(ibeacon.get_major()) + ",";
+              payload += "\"minor\":" + std::to_string(ibeacon.get_minor()) + ",";
+              payload += "\"tx_power\":" + std::to_string(ibeacon.get_signal_power()) + ",";
+              payload += "\"timestamp\":\"" + std::string(time_str) + "\"";
+              payload += "}";
+
+              // Publish to MQTT
+              id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+
+              // Update beacon counter
+              id(beacon_counter) += 1;
+
+              // Debug logging
+              ESP_LOGD("ble_triangulation", "Published iBeacon: MAC=%s, RSSI=%d",
+                       mac_address, x.get_rssi());
+            }
+
+# Time component for timestamps
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+# Global variable to count beacons
+globals:
+  - id: beacon_counter
+    type: int
+    initial_value: '0'
+
+# Additional sensors for monitoring
+sensor:
+  # Track number of beacons detected
+  - platform: template
+    name: "${friendly_name} Beacons Count"
+    lambda: |-
+      int count = id(beacon_counter);
+      id(beacon_counter) = 0;  // Reset counter
+      return count;
+    update_interval: 30s
+    unit_of_measurement: "beacons"
+    accuracy_decimals: 0
+    icon: "mdi:bluetooth"
+
+# Text sensor for proxy identification
+text_sensor:
+  - platform: template
+    name: "${friendly_name} Triangulation ID"
+    lambda: |-
+      return {"${proxy_id}"};
+    update_interval: never
+    icon: "mdi:map-marker"
+    entity_category: diagnostic

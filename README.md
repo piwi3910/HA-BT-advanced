@@ -58,43 +58,115 @@ After installation, a new sidebar item "BT Advanced" will appear in your Home As
 
 ### Step 3: Set Up ESP32 Proxies
 
-1. **Flash ESP32 devices** with the provided ESPHome configuration:
+You have three options for setting up your ESP32 proxies:
+
+#### Option 1: Use with Official ESPHome Bluetooth Proxy Packages (Recommended)
+
+If you're already using ESPHome Bluetooth Proxies, extend them with our triangulation features:
+
+```yaml
+# esphome_ble_proxy_extended.yaml
+substitutions:
+  name: your-device-name
+  friendly_name: "Your Device Name"
+  proxy_id: living_room  # Unique ID for triangulation
+  mqtt_topic_prefix: "ble-triangulation"
+
+packages:
+  # Choose your hardware package:
+  # For Generic ESP32:
+  esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/esp32-generic.yaml@main
+
+  # For Olimex ESP32-POE-ISO:
+  # esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/olimex/olimex-esp32-poe-iso.yaml@main
+
+# Your existing configuration...
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# Add MQTT for triangulation
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+
+# The rest is handled by our included configuration
+```
+
+#### Option 2: Use Standalone Configuration
+
+For dedicated triangulation proxies, use our complete configuration:
+
 ```yaml
 # esphome_ble_proxy.yaml
+substitutions:
+  proxy_id: kitchen_proxy  # Change for each proxy
+  device_name: ble-proxy-${proxy_id}
+  friendly_name: "BLE Proxy ${proxy_id}"
+
 esphome:
-  name: ble-proxy-1
+  name: "${device_name}"
   platform: ESP32
   board: esp32dev
 
 wifi:
-  ssid: "YOUR_WIFI_SSID"
-  password: "YOUR_WIFI_PASSWORD"
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
 mqtt:
-  broker: YOUR_MQTT_BROKER_IP
-  username: mqtt_user
-  password: mqtt_password
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
 
 esp32_ble_tracker:
   scan_parameters:
-    interval: 320ms
-    window: 48ms
-    active: false
+    interval: 1100ms
+    window: 1100ms
+```
 
-bluetooth_proxy:
-  active: false
+See `esphome_ble_proxy.yaml` for the complete configuration.
 
-ble_tracker:
-  on_ble_advertise:
-    - then:
-        - mqtt.publish:
-            topic: ble_triangulation/advertisements/ble-proxy-1
-            payload: !lambda |-
-              char buffer[256];
-              sprintf(buffer, "{\"mac\":\"%s\",\"rssi\":%d,\"timestamp\":\"%s\"}",
-                      x.address_str().c_str(), x.get_rssi(),
-                      id(homeassistant_time).now().timestamp);
-              return std::string(buffer);
+#### Option 3: For Specific Hardware (Olimex Example)
+
+If you have specific hardware like Olimex ESP32-POE-ISO:
+
+```yaml
+# esphome_ble_proxy_olimex.yaml
+substitutions:
+  name: olimex-esp32-poe-iso-ad1678
+  friendly_name: "Bluetooth Proxy ad1678"
+  proxy_id: olimex_ad1678  # Unique ID for triangulation
+
+packages:
+  esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/olimex/olimex-esp32-poe-iso.yaml@main
+
+# See esphome_ble_proxy_olimex.yaml for complete configuration
+```
+
+#### Supported Hardware Packages
+
+Our triangulation works with all official ESPHome Bluetooth Proxy packages:
+- **Generic ESP32**: `esp32-generic.yaml`
+- **Olimex ESP32-POE-ISO**: `olimex/olimex-esp32-poe-iso.yaml`
+- **Olimex ESP32-POE**: `olimex/olimex-esp32-poe.yaml`
+- **M5Stack Atom Lite**: `m5stack-atom-lite.yaml`
+- **M5Stack Atom Echo**: `m5stack-atom-echo.yaml`
+- **ESP32-C3**: `esp32-c3.yaml`
+- **Shelly Plus Devices**: `shelly-plus.yaml`
+- **GL.iNet GL-S10**: `gl-s10.yaml`
+
+#### Create secrets.yaml
+
+Copy `esphome_secrets.example.yaml` to `secrets.yaml` and fill in your values:
+
+```yaml
+wifi_ssid: "YourWiFiSSID"
+wifi_password: "YourWiFiPassword"
+mqtt_broker: "192.168.1.100"
+mqtt_username: "mqtt_user"
+mqtt_password: "mqtt_password"
+api_encryption_key: "your_base64_key_here"
 ```
 
 2. **Add proxies** using the visual interface:
