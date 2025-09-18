@@ -12,6 +12,12 @@ class HABTAdvancedPanel extends HTMLElement {
     this.map = null;
     this.markers = {};
     this.zonePolygons = {};
+    this.discoveryMode = false;
+    this.discoveryEndTime = null;
+    this.discoveredBeacons = [];
+    this.selectedBeaconsToOnboard = new Set();
+    this.users = [];
+    this.virtualUsers = [];
   }
 
   set hass(hass) {
@@ -253,10 +259,205 @@ class HABTAdvancedPanel extends HTMLElement {
           font-weight: 500;
           margin-bottom: 4px;
         }
+        .discovery-section {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 16px;
+          border-radius: 8px;
+          margin-bottom: 24px;
+        }
+        .discovery-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        .discovery-title {
+          font-size: 20px;
+          font-weight: 600;
+        }
+        .discovery-button {
+          padding: 10px 20px;
+          border: none;
+          border-radius: 6px;
+          background: white;
+          color: #667eea;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+        .discovery-button:hover {
+          transform: scale(1.05);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .discovery-button.active {
+          background: #ff6b6b;
+          color: white;
+        }
+        .discovery-countdown {
+          font-size: 24px;
+          font-weight: bold;
+          text-align: center;
+          margin: 16px 0;
+        }
+        .discovered-list {
+          max-height: 300px;
+          overflow-y: auto;
+          background: white;
+          border-radius: 8px;
+          padding: 8px;
+          color: #333;
+        }
+        .discovered-beacon {
+          display: flex;
+          align-items: center;
+          padding: 12px;
+          margin: 4px 0;
+          background: #f8f9fa;
+          border-radius: 6px;
+          border: 2px solid transparent;
+          transition: all 0.3s;
+        }
+        .discovered-beacon:hover {
+          border-color: #667eea;
+          background: #f0f4ff;
+        }
+        .discovered-beacon.selected {
+          background: #e8f4ff;
+          border-color: #2196F3;
+        }
+        .beacon-checkbox {
+          margin-right: 12px;
+          width: 20px;
+          height: 20px;
+        }
+        .beacon-info {
+          flex: 1;
+        }
+        .beacon-mac {
+          font-family: monospace;
+          font-weight: 600;
+        }
+        .beacon-type {
+          display: inline-block;
+          padding: 2px 8px;
+          background: #667eea;
+          color: white;
+          border-radius: 4px;
+          font-size: 12px;
+          margin-left: 8px;
+        }
+        .signal-strength {
+          display: flex;
+          align-items: center;
+          margin-top: 4px;
+        }
+        .signal-bars {
+          display: flex;
+          gap: 2px;
+          margin-right: 8px;
+        }
+        .signal-bar {
+          width: 4px;
+          height: 16px;
+          background: #ddd;
+          border-radius: 2px;
+        }
+        .signal-bar.active {
+          background: #4CAF50;
+        }
+        .beacon-stats {
+          display: flex;
+          gap: 16px;
+          margin-top: 4px;
+          font-size: 12px;
+          color: #666;
+        }
+        .onboard-buttons {
+          display: flex;
+          gap: 8px;
+          margin-top: 16px;
+        }
+        .onboard-button {
+          flex: 1;
+          padding: 10px;
+          border: none;
+          border-radius: 6px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+        .onboard-single {
+          background: #2196F3;
+          color: white;
+        }
+        .onboard-selected {
+          background: #4CAF50;
+          color: white;
+        }
+        .onboard-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .onboard-button:disabled {
+          background: #ccc;
+          cursor: not-allowed;
+          transform: none;
+        }
+        .user-select {
+          margin-bottom: 12px;
+        }
+        .user-select label {
+          display: block;
+          margin-bottom: 4px;
+          font-weight: 500;
+        }
+        .user-select select {
+          width: 100%;
+          padding: 8px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+        }
+        .create-virtual-user {
+          display: flex;
+          gap: 8px;
+          margin-top: 8px;
+        }
+        .create-virtual-user input {
+          flex: 1;
+          padding: 8px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+        }
+        .create-virtual-user button {
+          padding: 8px 16px;
+          background: #667eea;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
       </style>
 
       <div class="container">
         <div class="sidebar">
+          <!-- Discovery Section -->
+          <div class="discovery-section">
+            <div class="discovery-header">
+              <div class="discovery-title">🔍 Beacon Discovery</div>
+              <button class="discovery-button" id="discovery-toggle">Start Discovery</button>
+            </div>
+            <div id="discovery-content" style="display: none;">
+              <div class="discovery-countdown" id="discovery-countdown"></div>
+              <div class="discovered-list" id="discovered-list"></div>
+              <div class="onboard-buttons" id="onboard-buttons" style="display: none;">
+                <button class="onboard-button onboard-selected" id="onboard-selected-btn" disabled>
+                  Onboard Selected (0)
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="section">
             <div class="section-title">Proxies</div>
             <div id="proxy-list"></div>
@@ -264,9 +465,8 @@ class HABTAdvancedPanel extends HTMLElement {
           </div>
 
           <div class="section">
-            <div class="section-title">Beacons</div>
+            <div class="section-title">Onboarded Beacons</div>
             <div id="beacon-list"></div>
-            <button class="add-button" id="add-beacon-btn">Add Beacon</button>
           </div>
 
           <div class="section">
@@ -315,23 +515,32 @@ class HABTAdvancedPanel extends HTMLElement {
         </div>
       </div>
 
-      <!-- Add Beacon Modal -->
-      <div id="beacon-modal" class="modal">
-        <div class="modal-content">
-          <div class="modal-title">Add Beacon</div>
-          <div class="form-group">
-            <label class="form-label">MAC Address</label>
-            <input type="text" id="beacon-mac" class="form-input" placeholder="AA:BB:CC:DD:EE:FF">
+      <!-- Onboard Beacon Modal -->
+      <div id="onboard-modal" class="modal">
+        <div class="modal-content" style="min-width: 500px;">
+          <div class="modal-title">Onboard Beacon</div>
+          <div id="onboard-beacon-info" style="background: #f0f4ff; padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+            <!-- Beacon info will be displayed here -->
           </div>
           <div class="form-group">
-            <label class="form-label">Name</label>
-            <input type="text" id="beacon-name" class="form-input" placeholder="e.g., My Keys">
+            <label class="form-label">Name *</label>
+            <input type="text" id="onboard-name" class="form-input" placeholder="e.g., John's Keys" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Owner</label>
+            <select id="onboard-owner" class="form-select">
+              <option value="">No Owner</option>
+            </select>
+            <div class="create-virtual-user">
+              <input type="text" id="virtual-user-name" placeholder="New guest name...">
+              <button id="create-virtual-btn">Create Guest</button>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Category</label>
-            <select id="beacon-category" class="form-select">
-              <option value="person">Person</option>
+            <select id="onboard-category" class="form-select">
               <option value="item">Item</option>
+              <option value="person">Person</option>
               <option value="pet">Pet</option>
               <option value="vehicle">Vehicle</option>
               <option value="other">Other</option>
@@ -339,11 +548,68 @@ class HABTAdvancedPanel extends HTMLElement {
           </div>
           <div class="form-group">
             <label class="form-label">Icon</label>
-            <input type="text" id="beacon-icon" class="form-input" placeholder="mdi:key">
+            <input type="text" id="onboard-icon" class="form-input" placeholder="mdi:key">
+          </div>
+          <div class="form-group">
+            <label class="form-label">
+              <input type="checkbox" id="onboard-notifications" checked> Enable Notifications
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tracking Precision</label>
+            <select id="onboard-precision" class="form-select">
+              <option value="low">Low - Less accurate, saves battery</option>
+              <option value="medium" selected>Medium - Balanced</option>
+              <option value="high">High - Most accurate</option>
+            </select>
           </div>
           <div class="modal-buttons">
-            <button class="modal-button modal-cancel" id="beacon-cancel">Cancel</button>
-            <button class="modal-button modal-save" id="beacon-save">Save</button>
+            <button class="modal-button modal-cancel" id="onboard-cancel">Cancel</button>
+            <button class="modal-button modal-save" id="onboard-save">Onboard Beacon</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bulk Onboard Modal -->
+      <div id="bulk-onboard-modal" class="modal">
+        <div class="modal-content" style="min-width: 600px;">
+          <div class="modal-title">Onboard Multiple Beacons</div>
+          <div style="background: #f0f4ff; padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+            <strong>Selected Beacons:</strong> <span id="bulk-count">0</span>
+          </div>
+          <div id="bulk-beacon-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 16px;">
+            <!-- Selected beacons will be listed here -->
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default Owner</label>
+            <select id="bulk-owner" class="form-select">
+              <option value="">No Owner</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default Category</label>
+            <select id="bulk-category" class="form-select">
+              <option value="item">Item</option>
+              <option value="person">Person</option>
+              <option value="pet">Pet</option>
+              <option value="vehicle">Vehicle</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">
+              <input type="checkbox" id="bulk-notifications" checked> Enable Notifications for All
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Names for Each Beacon:</label>
+            <div id="bulk-names">
+              <!-- Individual name inputs will be generated here -->
+            </div>
+          </div>
+          <div class="modal-buttons">
+            <button class="modal-button modal-cancel" id="bulk-cancel">Cancel</button>
+            <button class="modal-button modal-save" id="bulk-save">Onboard All</button>
           </div>
         </div>
       </div>
@@ -456,13 +722,29 @@ class HABTAdvancedPanel extends HTMLElement {
       });
     });
 
+    // Discovery button
+    const discoveryToggle = this.shadowRoot.getElementById('discovery-toggle');
+    if (discoveryToggle) {
+      discoveryToggle.addEventListener('click', () => {
+        if (this.discoveryMode) {
+          this.stopDiscovery();
+        } else {
+          this.startDiscovery();
+        }
+      });
+    }
+
+    // Onboard selected button
+    const onboardSelectedBtn = this.shadowRoot.getElementById('onboard-selected-btn');
+    if (onboardSelectedBtn) {
+      onboardSelectedBtn.addEventListener('click', () => {
+        this.showBulkOnboardModal();
+      });
+    }
+
     // Add buttons
     this.shadowRoot.getElementById('add-proxy-btn').addEventListener('click', () => {
       this.showProxyModal();
-    });
-
-    this.shadowRoot.getElementById('add-beacon-btn').addEventListener('click', () => {
-      this.showBeaconModal();
     });
 
     this.shadowRoot.getElementById('add-zone-btn').addEventListener('click', () => {
@@ -736,6 +1018,454 @@ class HABTAdvancedPanel extends HTMLElement {
 
     // Load zones
     await this.loadZones();
+
+    // Load users
+    await this.loadUsers();
+  }
+
+  async loadUsers() {
+    try {
+      // Get all HA users and virtual users
+      const result = await this._hass.callService('ha_bt_advanced', 'get_all_users', {}, true);
+      if (result && result.users) {
+        this.users = result.users;
+        this.updateUserSelects();
+      }
+    } catch (error) {
+      console.error('Error loading users:', error);
+      // Fallback to just HA users
+      this.users = Object.values(this._hass.users || {}).map(user => ({
+        id: user.id,
+        name: user.name,
+        type: 'ha_user'
+      }));
+    }
+  }
+
+  updateUserSelects() {
+    // Update all user select dropdowns
+    const selects = ['onboard-owner', 'bulk-owner'];
+    selects.forEach(selectId => {
+      const select = this.shadowRoot.getElementById(selectId);
+      if (select) {
+        select.innerHTML = '<option value="">No Owner</option>';
+
+        // Add HA users
+        const haUsers = this.users.filter(u => u.type === 'ha_user');
+        if (haUsers.length > 0) {
+          const haGroup = document.createElement('optgroup');
+          haGroup.label = 'Home Assistant Users';
+          haUsers.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.name;
+            haGroup.appendChild(option);
+          });
+          select.appendChild(haGroup);
+        }
+
+        // Add virtual users
+        const virtualUsers = this.users.filter(u => u.type === 'virtual');
+        if (virtualUsers.length > 0) {
+          const vGroup = document.createElement('optgroup');
+          vGroup.label = 'Guest Users';
+          virtualUsers.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.name;
+            vGroup.appendChild(option);
+          });
+          select.appendChild(vGroup);
+        }
+      }
+    });
+  }
+
+  async startDiscovery() {
+    try {
+      // Start discovery mode
+      await this._hass.callService('ha_bt_advanced', 'start_discovery', {
+        duration: 60
+      });
+
+      this.discoveryMode = true;
+      this.discoveryEndTime = Date.now() + 60000;
+      this.discoveredBeacons = [];
+      this.selectedBeaconsToOnboard.clear();
+
+      // Update UI
+      const btn = this.shadowRoot.getElementById('discovery-toggle');
+      btn.textContent = 'Stop Discovery';
+      btn.classList.add('active');
+
+      const content = this.shadowRoot.getElementById('discovery-content');
+      content.style.display = 'block';
+
+      // Start polling for discovered beacons
+      this.startDiscoveryPolling();
+
+      // Start countdown
+      this.startCountdown();
+    } catch (error) {
+      console.error('Error starting discovery:', error);
+      alert('Failed to start discovery mode');
+    }
+  }
+
+  async stopDiscovery() {
+    try {
+      await this._hass.callService('ha_bt_advanced', 'stop_discovery', {});
+    } catch (error) {
+      console.error('Error stopping discovery:', error);
+    }
+
+    this.discoveryMode = false;
+    this.discoveryEndTime = null;
+
+    // Update UI
+    const btn = this.shadowRoot.getElementById('discovery-toggle');
+    btn.textContent = 'Start Discovery';
+    btn.classList.remove('active');
+
+    // Stop polling
+    if (this.discoveryInterval) {
+      clearInterval(this.discoveryInterval);
+      this.discoveryInterval = null;
+    }
+
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+  }
+
+  startCountdown() {
+    const countdownEl = this.shadowRoot.getElementById('discovery-countdown');
+
+    this.countdownInterval = setInterval(() => {
+      const remaining = Math.max(0, this.discoveryEndTime - Date.now());
+      const seconds = Math.ceil(remaining / 1000);
+
+      if (seconds === 0) {
+        this.stopDiscovery();
+        countdownEl.textContent = 'Discovery ended';
+      } else {
+        countdownEl.textContent = `⏱️ ${seconds}s remaining`;
+      }
+    }, 100);
+  }
+
+  startDiscoveryPolling() {
+    // Poll for discovered beacons every 2 seconds
+    this.discoveryInterval = setInterval(async () => {
+      try {
+        const result = await this._hass.callService('ha_bt_advanced', 'get_discovered_beacons', {}, true);
+        if (result && result.beacons) {
+          this.discoveredBeacons = result.beacons;
+          this.updateDiscoveredList();
+        }
+      } catch (error) {
+        console.error('Error polling discovered beacons:', error);
+      }
+    }, 2000);
+
+    // Initial poll
+    this.pollDiscoveredBeacons();
+  }
+
+  async pollDiscoveredBeacons() {
+    try {
+      const result = await this._hass.callService('ha_bt_advanced', 'get_discovered_beacons', {}, true);
+      if (result && result.beacons) {
+        this.discoveredBeacons = result.beacons;
+        this.updateDiscoveredList();
+      }
+    } catch (error) {
+      console.error('Error getting discovered beacons:', error);
+    }
+  }
+
+  updateDiscoveredList() {
+    const listEl = this.shadowRoot.getElementById('discovered-list');
+    const btnEl = this.shadowRoot.getElementById('onboard-buttons');
+
+    if (this.discoveredBeacons.length === 0) {
+      listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">Searching for nearby beacons...</div>';
+      btnEl.style.display = 'none';
+      return;
+    }
+
+    btnEl.style.display = 'block';
+
+    listEl.innerHTML = this.discoveredBeacons.map(beacon => {
+      const signalBars = this.getSignalBars(beacon.avg_rssi);
+      const isSelected = this.selectedBeaconsToOnboard.has(beacon.mac);
+
+      return `
+        <div class="discovered-beacon ${isSelected ? 'selected' : ''}" data-mac="${beacon.mac}">
+          <input type="checkbox" class="beacon-checkbox" ${isSelected ? 'checked' : ''}>
+          <div class="beacon-info">
+            <div>
+              <span class="beacon-mac">${beacon.mac}</span>
+              <span class="beacon-type">${beacon.beacon_type}</span>
+            </div>
+            <div class="signal-strength">
+              <div class="signal-bars">
+                ${signalBars}
+              </div>
+              <span>${beacon.avg_rssi} dBm</span>
+            </div>
+            <div class="beacon-stats">
+              <span>Seen ${beacon.count} times</span>
+              <span>${beacon.proxy_count} proxy${beacon.proxy_count !== 1 ? 'es' : ''}</span>
+              <span>First: ${this.formatTime(beacon.first_seen)}</span>
+            </div>
+          </div>
+          <button class="onboard-button onboard-single" onclick="this.getRootNode().host.onboardSingleBeacon('${beacon.mac}')">
+            Onboard
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    // Add checkbox listeners
+    listEl.querySelectorAll('.beacon-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', (e) => {
+        const beaconEl = e.target.closest('.discovered-beacon');
+        const mac = beaconEl.dataset.mac;
+
+        if (e.target.checked) {
+          this.selectedBeaconsToOnboard.add(mac);
+          beaconEl.classList.add('selected');
+        } else {
+          this.selectedBeaconsToOnboard.delete(mac);
+          beaconEl.classList.remove('selected');
+        }
+
+        this.updateOnboardButton();
+      });
+    });
+  }
+
+  getSignalBars(rssi) {
+    const bars = 5;
+    let active = 0;
+
+    if (rssi >= -50) active = 5;
+    else if (rssi >= -60) active = 4;
+    else if (rssi >= -70) active = 3;
+    else if (rssi >= -80) active = 2;
+    else if (rssi >= -90) active = 1;
+
+    let html = '';
+    for (let i = 0; i < bars; i++) {
+      html += `<div class="signal-bar ${i < active ? 'active' : ''}"></div>`;
+    }
+    return html;
+  }
+
+  formatTime(isoString) {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diff = now - date;
+
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    return date.toLocaleTimeString();
+  }
+
+  updateOnboardButton() {
+    const btn = this.shadowRoot.getElementById('onboard-selected-btn');
+    const count = this.selectedBeaconsToOnboard.size;
+
+    btn.textContent = `Onboard Selected (${count})`;
+    btn.disabled = count === 0;
+  }
+
+  async onboardSingleBeacon(mac) {
+    const beacon = this.discoveredBeacons.find(b => b.mac === mac);
+    if (!beacon) return;
+
+    this.currentBeaconToOnboard = beacon;
+    this.showOnboardModal(beacon);
+  }
+
+  showOnboardModal(beacon) {
+    const modal = this.shadowRoot.getElementById('onboard-modal');
+    const infoEl = this.shadowRoot.getElementById('onboard-beacon-info');
+
+    infoEl.innerHTML = `
+      <div><strong>MAC:</strong> ${beacon.mac}</div>
+      <div><strong>Type:</strong> ${beacon.beacon_type}</div>
+      <div><strong>Signal:</strong> ${beacon.avg_rssi} dBm</div>
+      <div><strong>Detected by:</strong> ${beacon.proxies.join(', ')}</div>
+    `;
+
+    // Reset form
+    this.shadowRoot.getElementById('onboard-name').value = '';
+    this.shadowRoot.getElementById('onboard-owner').value = '';
+    this.shadowRoot.getElementById('onboard-category').value = 'item';
+    this.shadowRoot.getElementById('onboard-icon').value = '';
+    this.shadowRoot.getElementById('onboard-notifications').checked = true;
+    this.shadowRoot.getElementById('onboard-precision').value = 'medium';
+
+    modal.style.display = 'flex';
+
+    // Setup modal handlers
+    const cancelBtn = this.shadowRoot.getElementById('onboard-cancel');
+    const saveBtn = this.shadowRoot.getElementById('onboard-save');
+    const createVirtualBtn = this.shadowRoot.getElementById('create-virtual-btn');
+
+    cancelBtn.onclick = () => modal.style.display = 'none';
+
+    saveBtn.onclick = async () => {
+      const name = this.shadowRoot.getElementById('onboard-name').value.trim();
+      if (!name) {
+        alert('Please enter a name for the beacon');
+        return;
+      }
+
+      try {
+        await this._hass.callService('ha_bt_advanced', 'onboard_beacon', {
+          mac_address: beacon.mac,
+          name: name,
+          owner: this.shadowRoot.getElementById('onboard-owner').value || undefined,
+          beacon_category: this.shadowRoot.getElementById('onboard-category').value,
+          beacon_icon: this.shadowRoot.getElementById('onboard-icon').value || undefined,
+          notifications_enabled: this.shadowRoot.getElementById('onboard-notifications').checked,
+          tracking_precision: this.shadowRoot.getElementById('onboard-precision').value
+        });
+
+        modal.style.display = 'none';
+        alert(`Successfully onboarded ${name}`);
+
+        // Refresh beacon list
+        await this.loadBeacons();
+
+        // Remove from discovered list
+        this.discoveredBeacons = this.discoveredBeacons.filter(b => b.mac !== beacon.mac);
+        this.updateDiscoveredList();
+      } catch (error) {
+        console.error('Error onboarding beacon:', error);
+        alert('Failed to onboard beacon: ' + error.message);
+      }
+    };
+
+    createVirtualBtn.onclick = async () => {
+      const name = this.shadowRoot.getElementById('virtual-user-name').value.trim();
+      if (!name) {
+        alert('Please enter a name for the virtual user');
+        return;
+      }
+
+      try {
+        const result = await this._hass.callService('ha_bt_advanced', 'create_virtual_user', {
+          name: name
+        }, true);
+
+        if (result && result.user_id) {
+          // Reload users and select the new one
+          await this.loadUsers();
+          this.shadowRoot.getElementById('onboard-owner').value = result.user_id;
+          this.shadowRoot.getElementById('virtual-user-name').value = '';
+          alert(`Created virtual user: ${name}`);
+        }
+      } catch (error) {
+        console.error('Error creating virtual user:', error);
+        alert('Failed to create virtual user');
+      }
+    };
+  }
+
+  showBulkOnboardModal() {
+    // Implementation for bulk onboarding modal
+    const modal = this.shadowRoot.getElementById('bulk-onboard-modal');
+    const countEl = this.shadowRoot.getElementById('bulk-count');
+    const listEl = this.shadowRoot.getElementById('bulk-beacon-list');
+    const namesEl = this.shadowRoot.getElementById('bulk-names');
+
+    const selectedBeacons = this.discoveredBeacons.filter(b =>
+      this.selectedBeaconsToOnboard.has(b.mac)
+    );
+
+    countEl.textContent = selectedBeacons.length;
+
+    // Show selected beacons
+    listEl.innerHTML = selectedBeacons.map(b => `
+      <div style="padding: 8px; background: #f5f5f5; margin: 4px 0; border-radius: 4px;">
+        <strong>${b.mac}</strong> - ${b.beacon_type} - ${b.avg_rssi} dBm
+      </div>
+    `).join('');
+
+    // Create name inputs for each beacon
+    namesEl.innerHTML = selectedBeacons.map(b => `
+      <div style="margin: 8px 0;">
+        <label style="display: block; font-size: 12px; color: #666;">${b.mac}</label>
+        <input type="text" class="form-input beacon-name-input" data-mac="${b.mac}"
+               placeholder="Enter name for this beacon">
+      </div>
+    `).join('');
+
+    modal.style.display = 'flex';
+
+    // Setup handlers
+    const cancelBtn = this.shadowRoot.getElementById('bulk-cancel');
+    const saveBtn = this.shadowRoot.getElementById('bulk-save');
+
+    cancelBtn.onclick = () => modal.style.display = 'none';
+
+    saveBtn.onclick = async () => {
+      const beacons = [];
+      let allNamesProvided = true;
+
+      namesEl.querySelectorAll('.beacon-name-input').forEach(input => {
+        const name = input.value.trim();
+        if (!name) {
+          allNamesProvided = false;
+        } else {
+          beacons.push({
+            mac: input.dataset.mac,
+            name: name
+          });
+        }
+      });
+
+      if (!allNamesProvided) {
+        alert('Please provide names for all beacons');
+        return;
+      }
+
+      const owner = this.shadowRoot.getElementById('bulk-owner').value;
+      const category = this.shadowRoot.getElementById('bulk-category').value;
+      const notifications = this.shadowRoot.getElementById('bulk-notifications').checked;
+
+      try {
+        // Onboard each beacon
+        for (const beacon of beacons) {
+          await this._hass.callService('ha_bt_advanced', 'onboard_beacon', {
+            mac_address: beacon.mac,
+            name: beacon.name,
+            owner: owner || undefined,
+            beacon_category: category,
+            notifications_enabled: notifications,
+            tracking_precision: 'medium'
+          });
+        }
+
+        modal.style.display = 'none';
+        alert(`Successfully onboarded ${beacons.length} beacons`);
+
+        // Clear selection
+        this.selectedBeaconsToOnboard.clear();
+
+        // Refresh
+        await this.loadBeacons();
+        await this.pollDiscoveredBeacons();
+      } catch (error) {
+        console.error('Error onboarding beacons:', error);
+        alert('Failed to onboard some beacons');
+      }
+    };
   }
 
   async loadProxies() {
