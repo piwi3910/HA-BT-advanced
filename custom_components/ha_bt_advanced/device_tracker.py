@@ -38,12 +38,16 @@ async def async_setup_entry(
         _LOGGER.debug(f"Adding device tracker for beacon: {beacon_id}")
         async_add_entities([BLEBeaconTracker(hass, manager, beacon_id, beacon_name)])
     
-    # Register callback to add device trackers when beacons are discovered
+    # Register callback to add device trackers when beacons are onboarded
     manager.register_beacon_callback(async_add_beacon)
-    
-    # Add existing beacons
-    for beacon_id, beacon_info in manager.beacons.items():
-        async_add_beacon(beacon_id, beacon_info.get("name", f"Beacon {beacon_id}"))
+
+    # Add only onboarded beacons (those loaded from config)
+    if hasattr(manager, 'beacons'):
+        for beacon_id, beacon_info in manager.beacons.items():
+            # Only add beacons that have been explicitly onboarded
+            beacon_name = beacon_info.get("name", beacon_info.get(CONF_NAME, f"Beacon {beacon_id}"))
+            _LOGGER.info(f"Creating device tracker for onboarded beacon: {beacon_id} - {beacon_name}")
+            async_add_beacon(beacon_id, beacon_name)
 
 
 class BLEBeaconTracker(TrackerEntity):

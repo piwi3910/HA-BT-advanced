@@ -6,6 +6,10 @@ reload_integration:
   name: Reload Integration
   description: Reload the HA-BT-Advanced integration without restarting Home Assistant.
 
+cleanup_devices:
+  name: Clean Up Devices
+  description: Remove all beacon devices that are not explicitly onboarded. Use this to clean up old beacons that were automatically created.
+
 add_beacon:
   name: Add Beacon
   description: Add a new BLE beacon to track.

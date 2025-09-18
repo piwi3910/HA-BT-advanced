@@ -272,12 +272,22 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
         beacons = []
         beacon_options = {}
 
-        if manager and hasattr(manager, '_trackers'):
-            # Get onboarded beacons
-            for mac, tracker in manager._trackers.items():
-                beacon_name = f"{tracker.name} ({mac})"
-                beacons.append(beacon_name)
-                beacon_options[mac] = beacon_name
+        if manager:
+            # Try to get beacons from the manager.beacons dictionary
+            if hasattr(manager, 'beacons'):
+                for mac, beacon_info in manager.beacons.items():
+                    name = beacon_info.get('name', f'Beacon {mac}')
+                    beacon_name = f"{name} ({mac})"
+                    beacons.append(beacon_name)
+                    beacon_options[mac] = beacon_name
+                    _LOGGER.debug(f"Found beacon: {beacon_name}")
+            # Also check _trackers if beacons is empty
+            elif hasattr(manager, '_trackers'):
+                for mac, tracker in manager._trackers.items():
+                    beacon_name = f"{tracker.name} ({mac})"
+                    beacons.append(beacon_name)
+                    beacon_options[mac] = beacon_name
+                    _LOGGER.debug(f"Found tracker: {beacon_name}")
 
         if not beacons:
             beacons = ["No beacons onboarded"]
@@ -430,6 +440,7 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
             errors=errors,
             description_placeholders={
                 "beacon_count": str(len(discovered_options)),
+                "info": f"Found {len(discovered_options)} beacon(s)"
             }
         )
 

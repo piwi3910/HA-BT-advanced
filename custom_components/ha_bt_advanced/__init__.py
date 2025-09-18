@@ -104,6 +104,41 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.services.async_register(
         DOMAIN, "reload_integration", handle_reload
     )
+
+    async def handle_cleanup_devices(call: ServiceCall) -> None:
+        """Remove all beacon devices that are not onboarded."""
+        _LOGGER.info("Cleaning up non-onboarded beacon devices")
+
+        # Get device registry
+        from homeassistant.helpers import device_registry as dr
+        device_registry = dr.async_get(hass)
+
+        # Get all devices for this integration
+        devices = [
+            device for device in device_registry.devices.values()
+            if any(entry.entry_id in device.config_entries for entry in [entry])
+        ]
+
+        # Get list of onboarded beacon MACs
+        onboarded_macs = set(manager.beacons.keys()) if manager else set()
+
+        removed_count = 0
+        for device in devices:
+            # Check if this is a beacon device
+            for identifier in device.identifiers:
+                if len(identifier) == 2 and identifier[0] == DOMAIN:
+                    device_mac = identifier[1].upper()
+                    # If it's a beacon MAC and not onboarded, remove it
+                    if ":" in device_mac and device_mac not in onboarded_macs:
+                        _LOGGER.info(f"Removing non-onboarded beacon device: {device_mac}")
+                        device_registry.async_remove_device(device.id)
+                        removed_count += 1
+
+        _LOGGER.info(f"Cleanup complete. Removed {removed_count} non-onboarded beacon devices")
+
+    hass.services.async_register(
+        DOMAIN, "cleanup_devices", handle_cleanup_devices
+    )
     
     async def handle_add_beacon(call: ServiceCall) -> None:
         """Handle the add_beacon service call."""
