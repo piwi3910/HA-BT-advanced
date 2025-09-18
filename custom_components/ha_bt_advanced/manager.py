@@ -166,7 +166,6 @@ class TriangulationManager:
         beacon_dir = Path(self.hass.config.path(BEACON_CONFIG_DIR))
 
         if not beacon_dir.exists():
-            if not beacon_dir.exists():
             await self.hass.async_add_executor_job(lambda: beacon_dir.mkdir(parents=True, exist_ok=True))
             return beacons
 
@@ -192,7 +191,6 @@ class TriangulationManager:
         proxy_dir = Path(self.hass.config.path(PROXY_CONFIG_DIR))
 
         if not proxy_dir.exists():
-            if not proxy_dir.exists():
             await self.hass.async_add_executor_job(lambda: proxy_dir.mkdir(parents=True, exist_ok=True))
             return proxies
 
