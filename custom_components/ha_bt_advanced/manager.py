@@ -131,6 +131,7 @@ class TriangulationManager:
         self._proxy_last_seen = {}
         self._beacon_last_seen = {}
         self._proxy_offline_notifications = {}
+        self._proxy_metadata = {}  # Store proxy metadata from status messages
 
         # Calibration data
         self._calibration_mode = {}  # proxy_id -> {start_time, reference_distance, duration, rssi_samples}
@@ -532,17 +533,25 @@ class TriangulationManager:
     async def _mqtt_message_received(self, msg) -> None:
         """Handle received MQTT message."""
         try:
-            # Extract proxy ID from topic
+            # Parse topic to determine message type
             topic_parts = msg.topic.split("/")
             if len(topic_parts) < 2:
                 return
-                
-            proxy_id = topic_parts[-1]
 
-            # Parse payload first
+            # Parse payload
             payload = json.loads(msg.payload)
             if not isinstance(payload, dict):
                 return
+
+            # Check if this is a proxy status message
+            if "proxy" in topic_parts and "status" in topic_parts:
+                # Handle proxy status message
+                proxy_id = topic_parts[-2]  # proxy_id is before "status"
+                await self._handle_proxy_status(proxy_id, payload)
+                return
+
+            # Otherwise it's a beacon message
+            proxy_id = topic_parts[-1]
 
             # Update proxy last seen timestamp
             current_time = time.time()
@@ -795,6 +804,79 @@ class TriangulationManager:
             _LOGGER.error(f"Invalid JSON payload: {msg.payload}")
         except Exception as e:
             _LOGGER.exception(f"Error processing MQTT message: {e}")
+
+    async def _handle_proxy_status(self, proxy_id: str, payload: Dict[str, Any]) -> None:
+        """Handle proxy status message with metadata."""
+        try:
+            current_time = time.time()
+
+            # Update proxy last seen timestamp
+            self._proxy_last_seen[proxy_id] = current_time
+
+            # Auto-detect new proxy if not already known
+            if proxy_id not in self.proxies:
+                _LOGGER.info(f"Auto-detected new proxy from status message: {proxy_id}")
+                # Use home coordinates as default
+                latitude = self.hass.config.latitude
+                longitude = self.hass.config.longitude
+
+                # Add the proxy automatically
+                await self.add_proxy(proxy_id, latitude, longitude)
+                _LOGGER.info(f"Added auto-detected proxy {proxy_id} at ({latitude}, {longitude})")
+
+            # Store proxy metadata
+            if proxy_id not in self._proxy_metadata:
+                self._proxy_metadata[proxy_id] = {}
+
+            # Update metadata fields
+            metadata = self._proxy_metadata[proxy_id]
+            metadata['status'] = payload.get('status', 'online')
+            metadata['ip_address'] = payload.get('ip_address')
+            metadata['mac_address'] = payload.get('mac_address')
+            metadata['wifi_ssid'] = payload.get('wifi_ssid')
+            metadata['wifi_rssi'] = payload.get('wifi_rssi')
+            metadata['hardware'] = payload.get('hardware', 'ESP32')
+            metadata['board'] = payload.get('board')
+            metadata['esphome_version'] = payload.get('esphome_version')
+            metadata['temperature'] = payload.get('temperature')
+            metadata['free_heap'] = payload.get('free_heap')
+            metadata['uptime'] = payload.get('uptime')
+            metadata['cpu_frequency'] = payload.get('cpu_frequency')
+            metadata['flash_size'] = payload.get('flash_size')
+            metadata['timestamp'] = payload.get('timestamp')
+            metadata['last_seen'] = current_time
+
+            # Clear any offline notifications for this proxy
+            notification_id = NOTIFICATION_PROXY_OFFLINE.format(proxy_id)
+            if notification_id in self._proxy_offline_notifications:
+                del self._proxy_offline_notifications[notification_id]
+
+                # Fire event for proxy coming back online
+                self.hass.bus.async_fire(
+                    EVENT_PROXY_STATUS_CHANGE,
+                    {
+                        ATTR_PROXY_ID: proxy_id,
+                        "status": metadata.get('status', 'online'),
+                        ATTR_LAST_SEEN: current_time,
+                        "ip_address": metadata.get('ip_address'),
+                        "wifi_ssid": metadata.get('wifi_ssid'),
+                        "wifi_rssi": metadata.get('wifi_rssi'),
+                        "temperature": metadata.get('temperature'),
+                        "uptime": metadata.get('uptime'),
+                    }
+                )
+
+            # Log status update
+            _LOGGER.debug(
+                f"Updated proxy {proxy_id} status: "
+                f"IP={metadata.get('ip_address')}, "
+                f"WiFi={metadata.get('wifi_ssid')}@{metadata.get('wifi_rssi')}dBm, "
+                f"Temp={metadata.get('temperature')}°C, "
+                f"Uptime={metadata.get('uptime')}s"
+            )
+
+        except Exception as e:
+            _LOGGER.error(f"Error handling proxy status for {proxy_id}: {e}")
 
     async def _subscribe_mqtt(self) -> None:
         """Subscribe to MQTT topics."""
@@ -1339,6 +1421,14 @@ class TriangulationManager:
     def get_calibration_results(self, proxy_id: str) -> Optional[Dict[str, Any]]:
         """Get calibration results for a proxy."""
         return self._calibration_results.get(proxy_id)
+
+    def get_proxy_metadata(self, proxy_id: str) -> Optional[Dict[str, Any]]:
+        """Get metadata for a proxy from status messages."""
+        return self._proxy_metadata.get(proxy_id)
+
+    def get_all_proxy_metadata(self) -> Dict[str, Dict[str, Any]]:
+        """Get metadata for all proxies."""
+        return self._proxy_metadata.copy()
 
     def is_proxy_calibrating(self, proxy_id: str) -> bool:
         """Check if a proxy is currently in calibration mode."""

@@ -41,6 +41,41 @@ mqtt:
   client_id: "${device_name}"
   discovery: true
   discovery_prefix: homeassistant
+  on_connect:
+    - then:
+        - lambda: |-
+            // Publish proxy status with metadata
+            std::string status_payload = "{";
+            status_payload += "\"status\":\"online\",";
+            status_payload += "\"proxy_id\":\"${proxy_id}\",";
+            status_payload += "\"ip_address\":\"" + WiFi.localIP().toString().c_str() + "\",";
+            status_payload += "\"mac_address\":\"" + get_mac_address_pretty() + "\",";
+            status_payload += "\"esphome_version\":\"" ESPHOME_VERSION "\",";
+            status_payload += "\"hardware\":\"ESP32\",";
+            status_payload += "\"board\":\"${board}\",";
+            status_payload += "\"wifi_ssid\":\"" + WiFi.SSID().c_str() + "\",";
+            status_payload += "\"wifi_rssi\":" + std::to_string(WiFi.RSSI()) + ",";
+            status_payload += "\"free_heap\":" + std::to_string(ESP.getFreeHeap()) + ",";
+            status_payload += "\"uptime\":" + std::to_string(millis() / 1000) + ",";
+
+            // Add temperature if available
+            if (!std::isnan(id(internal_temp).state)) {
+              status_payload += "\"temperature\":" + std::to_string(id(internal_temp).state) + ",";
+            }
+
+            status_payload += "\"timestamp\":\"" + id(homeassistant_time).now().strftime("%Y-%m-%dT%H:%M:%SZ") + "\"";
+            status_payload += "}";
+
+            id(mqtt_client).publish("${mqtt_topic_prefix}/proxy/${proxy_id}/status", status_payload);
+            ESP_LOGI("mqtt", "Published proxy status: %s", status_payload.c_str());
+  on_disconnect:
+    - then:
+        - mqtt.publish_json:
+            topic: "${mqtt_topic_prefix}/proxy/${proxy_id}/status"
+            payload: |-
+              root["status"] = "offline";
+              root["proxy_id"] = "${proxy_id}";
+              root["timestamp"] = id(homeassistant_time).now().strftime("%Y-%m-%dT%H:%M:%SZ");
 
 # Enable BLE tracking
 esp32_ble_tracker:
@@ -82,8 +117,9 @@ esp32_ble_tracker:
               id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
               ESP_LOGD("ble_tracker", "Published iBeacon: %s", payload.c_str());
             }
-            // Process Eddystone advertisements
-            else if (x.get_service_data_uuid() == esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
+
+            // Process Eddystone advertisements (check independently from iBeacon)
+            if (x.get_service_data_uuid() == esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
               // Eddystone uses service UUID 0xFEAA
               auto data = x.get_service_data();
 
@@ -181,11 +217,13 @@ esp32_ble_tracker:
                 }
               }
             }
-            // Process other BLE advertisements (for future expansion)
-            else {
-              // Could handle other beacon types here (AltBeacon, RuuviTag, etc.)
-              // For now, just log that we saw something else
-              ESP_LOGV("ble_tracker", "Unhandled advertisement from %s", mac_address.c_str());
+
+            // Log unhandled advertisement types for debugging
+            // Note: A beacon may send multiple frame types (iBeacon, Eddystone, etc.)
+            // so we only log if NONE of the above matched
+            if (!x.get_ibeacon().has_value() &&
+                x.get_service_data_uuid() != esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
+              ESP_LOGV("ble_tracker", "Unhandled advertisement type from %s", mac_address.c_str());
             }
 
 # Time component to provide accurate timestamps
@@ -193,21 +231,39 @@ time:
   - platform: homeassistant
     id: homeassistant_time
 
-# Sensors to monitor system health
+# Sensors to monitor system health (also included in MQTT messages)
 sensor:
   - platform: wifi_signal
     name: "${friendly_name} WiFi Signal"
+    id: wifi_signal_sensor
     update_interval: 60s
 
   - platform: uptime
     name: "${friendly_name} Uptime"
+    id: uptime_sensor
     update_interval: 60s
     unit_of_measurement: seconds
 
-  # Only include if your ESP32 supports internal temperature
-  # - platform: internal_temperature
-  #   name: "${friendly_name} Temperature"
-  #   update_interval: 60s
+  # Internal temperature (uncomment if your ESP32 supports it)
+  - platform: internal_temperature
+    name: "${friendly_name} Temperature"
+    id: internal_temp
+    update_interval: 60s
+
+  # Free heap memory
+  - platform: template
+    name: "${friendly_name} Free Memory"
+    id: free_heap
+    lambda: |-
+      return ESP.getFreeHeap();
+    unit_of_measurement: "bytes"
+    update_interval: 60s
+
+  # WiFi RSSI
+  - platform: wifi_signal
+    name: "${friendly_name} WiFi RSSI"
+    id: wifi_rssi
+    update_interval: 60s
 
 # Binary sensor for connection status
 binary_sensor:
@@ -223,7 +279,68 @@ text_sensor:
     update_interval: never
     icon: "mdi:identifier"
 
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} IP Address"
+      id: ip_address
+    ssid:
+      name: "${friendly_name} Connected SSID"
+      id: connected_ssid
+    mac_address:
+      name: "${friendly_name} MAC Address"
+      id: mac_address
+
 # Switch to restart the ESP32
 switch:
   - platform: restart
     name: "${friendly_name} Restart"
+
+# Periodic status update
+interval:
+  - interval: 60s
+    then:
+      - lambda: |-
+          // Publish proxy status update every 60 seconds
+          std::string status_payload = "{";
+          status_payload += "\"status\":\"online\",";
+          status_payload += "\"proxy_id\":\"${proxy_id}\",";
+
+          // Network info
+          status_payload += "\"ip_address\":\"" + id(ip_address).state + "\",";
+          status_payload += "\"mac_address\":\"" + id(mac_address).state + "\",";
+          status_payload += "\"wifi_ssid\":\"" + id(connected_ssid).state + "\",";
+          status_payload += "\"wifi_rssi\":" + std::to_string((int)id(wifi_rssi).state) + ",";
+          status_payload += "\"wifi_signal\":" + std::to_string((int)id(wifi_signal_sensor).state) + ",";
+
+          // System info
+          status_payload += "\"hardware\":\"ESP32\",";
+          status_payload += "\"board\":\"${board}\",";
+          status_payload += "\"esphome_version\":\"" ESPHOME_VERSION "\",";
+
+          // Memory and performance
+          status_payload += "\"free_heap\":" + std::to_string((int)id(free_heap).state) + ",";
+          status_payload += "\"uptime\":" + std::to_string((int)id(uptime_sensor).state) + ",";
+
+          // Temperature if available
+          if (!std::isnan(id(internal_temp).state)) {
+            status_payload += "\"temperature\":" + std::to_string(id(internal_temp).state) + ",";
+          }
+
+          // CPU frequency
+          status_payload += "\"cpu_frequency\":" + std::to_string(ESP.getCpuFreqMHz()) + ",";
+
+          // Flash chip info
+          status_payload += "\"flash_size\":" + std::to_string(ESP.getFlashChipSize()) + ",";
+
+          // Timestamp
+          auto time = id(homeassistant_time).now();
+          if (time.is_valid()) {
+            status_payload += "\"timestamp\":\"" + time.strftime("%Y-%m-%dT%H:%M:%SZ") + "\"";
+          } else {
+            status_payload += "\"timestamp\":null";
+          }
+
+          status_payload += "}";
+
+          id(mqtt_client).publish("${mqtt_topic_prefix}/proxy/${proxy_id}/status", status_payload, 0, true);
+          ESP_LOGD("mqtt", "Published proxy heartbeat");
