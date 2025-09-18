@@ -40,23 +40,27 @@ class HABTAdvancedPanel extends HTMLElement {
       return;
     }
 
-    // Wait for Leaflet to be loaded
+    // Load Leaflet dynamically if not already present
     return new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (window.L) {
-          clearInterval(checkInterval);
-          // Inject Leaflet CSS into shadow DOM
-          this.injectLeafletStyles();
-          resolve();
-        }
-      }, 100);
-
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        console.error('Leaflet failed to load');
+      // Load Leaflet JS
+      const leafletScript = document.createElement('script');
+      leafletScript.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      leafletScript.onload = () => {
+        // Inject Leaflet CSS into shadow DOM
+        this.injectLeafletStyles();
+        resolve();
+      };
+      leafletScript.onerror = () => {
+        console.error('Failed to load Leaflet from CDN');
         resolve(); // Resolve anyway to prevent hanging
-      }, 10000);
+      };
+      document.head.appendChild(leafletScript);
+
+      // Also add Leaflet CSS to main document
+      const leafletCSS = document.createElement('link');
+      leafletCSS.rel = 'stylesheet';
+      leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(leafletCSS);
     });
   }
 
@@ -1066,20 +1070,39 @@ class HABTAdvancedPanel extends HTMLElement {
 
   async loadUsers() {
     try {
-      // Get all HA users and virtual users
-      const result = await this._hass.callService('ha_bt_advanced', 'get_all_users', {}, true);
-      if (result && result.users) {
-        this.users = result.users;
-        this.updateUserSelects();
+      // For now, just use HA users. Virtual users will need to be stored in entities
+      this.users = [];
+
+      // Add Home Assistant users if available
+      if (this._hass.user) {
+        // Get current user first
+        this.users.push({
+          id: this._hass.user.id,
+          name: this._hass.user.name,
+          type: 'ha_user'
+        });
       }
+
+      // Check for virtual user entities (these would need to be created by the backend)
+      const virtualUserEntities = Object.keys(this._hass.states).filter(
+        entityId => entityId.startsWith('sensor.virtual_user_')
+      );
+
+      virtualUserEntities.forEach(entityId => {
+        const state = this._hass.states[entityId];
+        if (state && state.attributes) {
+          this.users.push({
+            id: state.attributes.user_id || entityId,
+            name: state.attributes.name || state.state,
+            type: 'virtual'
+          });
+        }
+      });
+
+      this.updateUserSelects();
     } catch (error) {
       console.error('Error loading users:', error);
-      // Fallback to just HA users
-      this.users = Object.values(this._hass.users || {}).map(user => ({
-        id: user.id,
-        name: user.name,
-        type: 'ha_user'
-      }));
+      this.users = [];
     }
   }
 
@@ -1198,16 +1221,8 @@ class HABTAdvancedPanel extends HTMLElement {
 
   startDiscoveryPolling() {
     // Poll for discovered beacons every 2 seconds
-    this.discoveryInterval = setInterval(async () => {
-      try {
-        const result = await this._hass.callService('ha_bt_advanced', 'get_discovered_beacons', {}, true);
-        if (result && result.beacons) {
-          this.discoveredBeacons = result.beacons;
-          this.updateDiscoveredList();
-        }
-      } catch (error) {
-        console.error('Error polling discovered beacons:', error);
-      }
+    this.discoveryInterval = setInterval(() => {
+      this.pollDiscoveredBeacons();
     }, 2000);
 
     // Initial poll
@@ -1216,11 +1231,29 @@ class HABTAdvancedPanel extends HTMLElement {
 
   async pollDiscoveredBeacons() {
     try {
-      const result = await this._hass.callService('ha_bt_advanced', 'get_discovered_beacons', {}, true);
-      if (result && result.beacons) {
-        this.discoveredBeacons = result.beacons;
-        this.updateDiscoveredList();
-      }
+      // Look for discovered beacon entities created by the backend
+      const discoveredEntities = Object.keys(this._hass.states).filter(
+        entityId => entityId.startsWith('sensor.discovered_beacon_')
+      );
+
+      this.discoveredBeacons = [];
+
+      discoveredEntities.forEach(entityId => {
+        const state = this._hass.states[entityId];
+        if (state && state.attributes && state.attributes.mac) {
+          this.discoveredBeacons.push({
+            mac: state.attributes.mac,
+            rssi: state.attributes.rssi || state.attributes.avg_rssi || -100,
+            avg_rssi: state.attributes.avg_rssi || state.attributes.rssi || -100,
+            beacon_type: state.attributes.beacon_type || 'Unknown',
+            proxies: state.attributes.proxies || [],
+            last_seen: state.attributes.last_seen || state.last_changed,
+            detection_count: state.attributes.detection_count || 1
+          });
+        }
+      });
+
+      this.updateDiscoveredList();
     } catch (error) {
       console.error('Error getting discovered beacons:', error);
     }
@@ -1400,17 +1433,17 @@ class HABTAdvancedPanel extends HTMLElement {
     }
 
     try {
-      const result = await this._hass.callService('ha_bt_advanced', 'create_virtual_user', {
+      await this._hass.callService('ha_bt_advanced', 'create_virtual_user', {
         name: name
-      }, true);
+      });
 
-      if (result && result.user_id) {
-        // Reload users and select the new one
-        await this.loadUsers();
-        this.shadowRoot.getElementById('onboard-owner').value = result.user_id;
-        this.shadowRoot.getElementById('virtual-user-name').value = '';
-        alert(`Created virtual user: ${name}`);
-      }
+      // Wait a moment for the entity to be created
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Reload users to pick up the new virtual user
+      await this.loadUsers();
+      this.shadowRoot.getElementById('virtual-user-name').value = '';
+      alert(`Created virtual user: ${name}`);
     } catch (error) {
       console.error('Error creating virtual user:', error);
       alert('Failed to create virtual user');
