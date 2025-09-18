@@ -17,9 +17,11 @@ esphome:
   friendly_name: ${friendly_name}
 
 # API encryption key (required by base package)
+# Set reboot_timeout to 0 to prevent conflicts with MQTT
 api:
   encryption:
     key: !secret api_encryption_key
+  reboot_timeout: 0s  # Disable reboot on API disconnect to allow MQTT to work
 
 # Add MQTT for BLE triangulation
 mqtt:
@@ -28,6 +30,13 @@ mqtt:
   password: !secret mqtt_password
   discovery: true
   topic_prefix: "${name}"
+  on_connect:
+    - logger.log: "MQTT Connected!"
+    - mqtt.publish:
+        topic: "${mqtt_topic_prefix}/status/${proxy_id}"
+        payload: "online"
+  on_disconnect:
+    - logger.log: "MQTT Disconnected!"
 
 # Script to publish BLE iBeacon data
 script:
