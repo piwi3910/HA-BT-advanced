@@ -267,15 +267,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ]
     )
 
-    # Register the panel using the correct API
+    # Register the panel using the correct API (following HACS pattern)
     await frontend.async_register_built_in_panel(
         hass,
         component_name="custom",
         sidebar_title="BT Advanced",
         sidebar_icon="mdi:bluetooth",
         frontend_url_path=f"ha-bt-advanced-{entry.entry_id}",
-        config={"entry_id": entry.entry_id},
-        module_url=f"/ha_bt_advanced_panel/{entry.entry_id}/ha-bt-advanced-panel.js",
+        config={
+            "entry_id": entry.entry_id,
+            "_panel_custom": {
+                "name": "ha-bt-advanced-panel",
+                "embed_iframe": False,
+                "trust_external": False,
+                "module_url": f"/ha_bt_advanced_panel/{entry.entry_id}/ha-bt-advanced-panel.js",
+            }
+        },
+        require_admin=False,
     )
 
     return True

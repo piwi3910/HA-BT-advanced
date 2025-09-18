@@ -106,9 +106,9 @@ class TriangulationManager:
         self._beacon_callbacks = set()
         self._update_callbacks = {}
         
-        # Beacon and proxy tracking
-        self.beacons = self._load_beacons()
-        self.proxies = self._load_proxies()
+        # Beacon and proxy tracking (will be loaded async in start())
+        self.beacons = {}
+        self.proxies = {}
         
         # Initialize zone manager
         self.zone_manager = ZoneManager(hass)
@@ -160,46 +160,54 @@ class TriangulationManager:
                 category=category,
             )
 
-    def _load_beacons(self) -> Dict[str, Dict[str, Any]]:
-        """Load beacon configuration from files."""
+    async def _async_load_beacons(self) -> Dict[str, Dict[str, Any]]:
+        """Load beacon configuration from files asynchronously."""
         beacons = {}
         beacon_dir = Path(self.hass.config.path(BEACON_CONFIG_DIR))
-        
+
         if not beacon_dir.exists():
-            beacon_dir.mkdir(parents=True, exist_ok=True)
+            await self.hass.async_add_executor_job(beacon_dir.mkdir, True, True)
             return beacons
-            
-        for file_path in beacon_dir.glob("*.yaml"):
+
+        file_paths = await self.hass.async_add_executor_job(
+            lambda: list(beacon_dir.glob("*.yaml"))
+        )
+
+        for file_path in file_paths:
             try:
-                with open(file_path, "r") as f:
-                    beacon_config = yaml.safe_load(f)
-                    if beacon_config and isinstance(beacon_config, dict):
-                        mac = file_path.stem.upper()
-                        beacons[mac] = beacon_config
+                content = await self.hass.async_add_executor_job(file_path.read_text)
+                beacon_config = yaml.safe_load(content)
+                if beacon_config and isinstance(beacon_config, dict):
+                    mac = file_path.stem.upper()
+                    beacons[mac] = beacon_config
             except Exception as e:
                 _LOGGER.error(f"Error loading beacon config from {file_path}: {e}")
-                
+
         return beacons
 
-    def _load_proxies(self) -> Dict[str, Dict[str, Any]]:
-        """Load proxy configuration from files."""
+    async def _async_load_proxies(self) -> Dict[str, Dict[str, Any]]:
+        """Load proxy configuration from files asynchronously."""
         proxies = {}
         proxy_dir = Path(self.hass.config.path(PROXY_CONFIG_DIR))
-        
+
         if not proxy_dir.exists():
-            proxy_dir.mkdir(parents=True, exist_ok=True)
+            await self.hass.async_add_executor_job(proxy_dir.mkdir, True, True)
             return proxies
-            
-        for file_path in proxy_dir.glob("*.yaml"):
+
+        file_paths = await self.hass.async_add_executor_job(
+            lambda: list(proxy_dir.glob("*.yaml"))
+        )
+
+        for file_path in file_paths:
             try:
-                with open(file_path, "r") as f:
-                    proxy_config = yaml.safe_load(f)
-                    if proxy_config and isinstance(proxy_config, dict):
-                        proxy_id = file_path.stem
-                        proxies[proxy_id] = proxy_config
+                content = await self.hass.async_add_executor_job(file_path.read_text)
+                proxy_config = yaml.safe_load(content)
+                if proxy_config and isinstance(proxy_config, dict):
+                    proxy_id = file_path.stem
+                    proxies[proxy_id] = proxy_config
             except Exception as e:
                 _LOGGER.error(f"Error loading proxy config from {file_path}: {e}")
-                
+
         return proxies
 
     def register_beacon_callback(self, callback_func: Callable[[str, str], None]) -> None:
@@ -279,11 +287,11 @@ class TriangulationManager:
         
         # Save to file
         beacon_dir = Path(self.hass.config.path(BEACON_CONFIG_DIR))
-        beacon_dir.mkdir(parents=True, exist_ok=True)
+        await self.hass.async_add_executor_job(beacon_dir.mkdir, True, True)
         
         beacon_file = beacon_dir / f"{mac}.yaml"
-        with open(beacon_file, "w") as f:
-            yaml.dump(beacon_config, f)
+        content = yaml.dump(beacon_config)
+        await self.hass.async_add_executor_job(beacon_file.write_text, content)
             
         # Add to in-memory config
         self.beacons[mac] = beacon_config
@@ -351,7 +359,7 @@ class TriangulationManager:
         beacon_file = beacon_dir / f"{mac}.yaml"
         
         if beacon_file.exists():
-            beacon_file.unlink()
+            await self.hass.async_add_executor_job(beacon_file.unlink)
             
         # Remove from in-memory config
         if mac in self.beacons:
@@ -411,11 +419,11 @@ class TriangulationManager:
         
         # Save to file
         proxy_dir = Path(self.hass.config.path(PROXY_CONFIG_DIR))
-        proxy_dir.mkdir(parents=True, exist_ok=True)
+        await self.hass.async_add_executor_job(proxy_dir.mkdir, True, True)
         
         proxy_file = proxy_dir / f"{proxy_id}.yaml"
-        with open(proxy_file, "w") as f:
-            yaml.dump(proxy_config, f)
+        content = yaml.dump(proxy_config)
+        await self.hass.async_add_executor_job(proxy_file.write_text, content)
             
         # Add to in-memory config
         self.proxies[proxy_id] = proxy_config
@@ -449,7 +457,7 @@ class TriangulationManager:
         proxy_file = proxy_dir / f"{proxy_id}.yaml"
         
         if proxy_file.exists():
-            proxy_file.unlink()
+            await self.hass.async_add_executor_job(proxy_file.unlink)
             
         # Remove from in-memory config
         if proxy_id in self.proxies:
@@ -903,6 +911,10 @@ class TriangulationManager:
 
     async def start(self) -> None:
         """Start the triangulation service."""
+        # Load configurations asynchronously
+        self.beacons = await self._async_load_beacons()
+        self.proxies = await self._async_load_proxies()
+
         # Subscribe to MQTT
         await self._subscribe_mqtt()
         
@@ -978,8 +990,8 @@ class TriangulationManager:
         beacon_dir = Path(self.hass.config.path(BEACON_CONFIG_DIR))
         beacon_file = beacon_dir / f"{mac}.yaml"
         
-        with open(beacon_file, "w") as f:
-            yaml.dump(beacon_config, f)
+        content = yaml.dump(beacon_config)
+        await self.hass.async_add_executor_job(beacon_file.write_text, content)
             
         # Update config entry
         config = dict(self.config_entry.data)
