@@ -211,80 +211,295 @@ class HABTAdvancedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
     """Handle HA-BT-Advanced options."""
 
-    DOMAIN = DOMAIN
-
     def __init__(self, config_entry):
         """Initialize options flow."""
-        # Store config_entry explicitly for use in async_step_init
-        self._config_entry = config_entry
+        self.config_entry = config_entry
         self.options = dict(config_entry.options)
         self.config_data = dict(config_entry.data)
+        self._discovered_beacons = []
+        self._selected_beacon = None
+        self._beacon_to_delete = None
 
     async def async_step_init(self, user_input=None):
-        """Manage basic options."""
+        """Manage the options menu."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=[
+                "beacons",
+                "proxies",
+                "discovery",
+                "signal_parameters",
+            ]
+        )
+
+    async def async_step_beacons(self, user_input=None):
+        """Manage beacons."""
         errors = {}
 
         if user_input is not None:
-            # Update service status
+            if user_input.get("add_beacon"):
+                return await self.async_step_discovery()
+            elif user_input.get("beacon_to_delete"):
+                self._beacon_to_delete = user_input["beacon_to_delete"]
+                return await self.async_step_confirm_delete_beacon()
+
+        # Get current beacons from manager
+        manager = self.hass.data[DOMAIN][self.config_entry.entry_id].get("manager")
+        beacons = []
+        beacon_options = {}
+
+        if manager:
+            # Get onboarded beacons
+            for mac, tracker in manager.beacon_trackers.items():
+                beacon_name = f"{tracker.name} ({mac})"
+                beacons.append(beacon_name)
+                beacon_options[mac] = beacon_name
+
+        if not beacons:
+            beacons = ["No beacons onboarded"]
+
+        schema = vol.Schema({
+            vol.Optional("add_beacon", default=False): bool,
+        })
+
+        if beacon_options:
+            schema = schema.extend({
+                vol.Optional("beacon_to_delete"): vol.In(beacon_options),
+            })
+
+        return self.async_show_form(
+            step_id="beacons",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "beacon_list": "\n".join(f"• {b}" for b in beacons),
+                "beacon_count": str(len(beacon_options)),
+            }
+        )
+
+    async def async_step_confirm_delete_beacon(self, user_input=None):
+        """Confirm beacon deletion."""
+        if user_input is not None:
+            if user_input.get("confirm"):
+                # Delete the beacon
+                manager = self.hass.data[DOMAIN][self.config_entry.entry_id].get("manager")
+                if manager:
+                    await manager.remove_beacon(self._beacon_to_delete)
+
+            return await self.async_step_beacons()
+
+        return self.async_show_form(
+            step_id="confirm_delete_beacon",
+            data_schema=vol.Schema({
+                vol.Required("confirm", default=False): bool,
+            }),
+            description_placeholders={
+                "beacon_mac": self._beacon_to_delete,
+            }
+        )
+
+    async def async_step_proxies(self, user_input=None):
+        """Manage proxies."""
+        errors = {}
+
+        # Get detected proxies from manager
+        manager = self.hass.data[DOMAIN][self.config_entry.entry_id].get("manager")
+        proxies = []
+
+        if manager:
+            # Get auto-detected proxies
+            for proxy_id, proxy_data in manager.proxy_configs.items():
+                status = "Online" if manager.proxy_manager.is_proxy_online(proxy_id) else "Offline"
+                proxies.append(f"{proxy_id} - {status}")
+
+        if not proxies:
+            proxies = ["No proxies detected"]
+
+        return self.async_show_form(
+            step_id="proxies",
+            data_schema=vol.Schema({}),
+            errors=errors,
+            description_placeholders={
+                "proxy_list": "\n".join(f"• {p}" for p in proxies),
+                "proxy_count": str(len(proxies)),
+                "info": "Proxies are automatically detected when they send data via MQTT."
+            }
+        )
+
+    async def async_step_discovery(self, user_input=None):
+        """Start beacon discovery mode."""
+        errors = {}
+
+        if user_input is not None:
+            if user_input.get("start_discovery"):
+                # Start discovery mode
+                manager = self.hass.data[DOMAIN][self.config_entry.entry_id].get("manager")
+                if manager:
+                    await manager.start_discovery(60)
+                    return await self.async_step_discovered_beacons()
+            else:
+                return await self.async_step_beacons()
+
+        return self.async_show_form(
+            step_id="discovery",
+            data_schema=vol.Schema({
+                vol.Required("start_discovery", default=False): bool,
+            }),
+            errors=errors,
+            description_placeholders={
+                "info": (
+                    "Discovery mode will scan for nearby BLE beacons for 60 seconds.\n"
+                    "Only beacons within ~5 meters (RSSI > -70 dBm) will be detected.\n"
+                    "Make sure your beacon is nearby and powered on."
+                ),
+            }
+        )
+
+    async def async_step_discovered_beacons(self, user_input=None):
+        """Show discovered beacons for onboarding."""
+        errors = {}
+
+        manager = self.hass.data[DOMAIN][self.config_entry.entry_id].get("manager")
+
+        if user_input is not None:
+            if user_input.get("beacon_to_onboard"):
+                self._selected_beacon = user_input["beacon_to_onboard"]
+                return await self.async_step_onboard_beacon()
+            else:
+                return await self.async_step_beacons()
+
+        # Get discovered beacons
+        discovered_options = {}
+
+        if manager and manager.discovery_manager:
+            discovered = manager.discovery_manager.get_discovered_beacons()
+            for beacon in discovered:
+                if beacon["mac"] not in manager.discovery_manager.onboarded_beacons:
+                    label = f"{beacon['mac']} - {beacon['beacon_type']} ({beacon['avg_rssi']} dBm)"
+                    discovered_options[beacon["mac"]] = label
+
+        if not discovered_options:
+            return self.async_show_form(
+                step_id="discovered_beacons",
+                data_schema=vol.Schema({}),
+                errors={"base": "no_beacons_found"},
+                description_placeholders={
+                    "info": "No new beacons discovered. Make sure your beacon is nearby and try again."
+                }
+            )
+
+        return self.async_show_form(
+            step_id="discovered_beacons",
+            data_schema=vol.Schema({
+                vol.Required("beacon_to_onboard"): vol.In(discovered_options),
+            }),
+            errors=errors,
+            description_placeholders={
+                "beacon_count": str(len(discovered_options)),
+            }
+        )
+
+    async def async_step_onboard_beacon(self, user_input=None):
+        """Onboard a specific beacon."""
+        errors = {}
+
+        if user_input is not None:
+            # Onboard the beacon
+            manager = self.hass.data[DOMAIN][self.config_entry.entry_id].get("manager")
+            if manager:
+                success = await manager.onboard_beacon(
+                    mac_address=self._selected_beacon,
+                    name=user_input[CONF_NAME],
+                    category=user_input.get("category", "item"),
+                    icon=user_input.get("icon"),
+                    notifications_enabled=user_input.get("notifications", True),
+                    tracking_precision=user_input.get("precision", "medium"),
+                )
+
+                if success:
+                    return await self.async_step_beacons()
+                else:
+                    errors["base"] = "onboarding_failed"
+
+        return self.async_show_form(
+            step_id="onboard_beacon",
+            data_schema=vol.Schema({
+                vol.Required(CONF_NAME): cv.string,
+                vol.Optional("category", default="item"): vol.In({
+                    "item": "Item",
+                    "person": "Person",
+                    "pet": "Pet",
+                    "vehicle": "Vehicle",
+                    "other": "Other",
+                }),
+                vol.Optional("icon"): cv.string,
+                vol.Optional("notifications", default=True): bool,
+                vol.Optional("precision", default="medium"): vol.In({
+                    "low": "Low",
+                    "medium": "Medium",
+                    "high": "High",
+                }),
+            }),
+            errors=errors,
+            description_placeholders={
+                "beacon_mac": self._selected_beacon,
+            }
+        )
+
+    async def async_step_signal_parameters(self, user_input=None):
+        """Configure signal parameters."""
+        errors = {}
+
+        if user_input is not None:
+            # Update signal parameters
             updated_data = dict(self.config_data)
-            updated_data[CONF_SERVICE_ENABLED] = user_input.get(CONF_SERVICE_ENABLED, True)
-            updated_data[CONF_MQTT_TOPIC] = user_input.get(CONF_MQTT_TOPIC, DEFAULT_MQTT_TOPIC_PREFIX)
-            
-            # Store signal parameters
-            signal_params = self.config_data.get(CONF_SIGNAL_PARAMETERS, {})
             updated_signal_params = {
-                CONF_TX_POWER: user_input.get(CONF_TX_POWER, signal_params.get(CONF_TX_POWER, DEFAULT_TX_POWER)),
-                CONF_PATH_LOSS_EXPONENT: user_input.get(CONF_PATH_LOSS_EXPONENT, signal_params.get(CONF_PATH_LOSS_EXPONENT, DEFAULT_PATH_LOSS_EXPONENT)),
-                CONF_RSSI_SMOOTHING: user_input.get(CONF_RSSI_SMOOTHING, signal_params.get(CONF_RSSI_SMOOTHING, DEFAULT_RSSI_SMOOTHING)),
-                CONF_POSITION_SMOOTHING: user_input.get(CONF_POSITION_SMOOTHING, signal_params.get(CONF_POSITION_SMOOTHING, DEFAULT_POSITION_SMOOTHING)),
-                CONF_MAX_READING_AGE: user_input.get(CONF_MAX_READING_AGE, signal_params.get(CONF_MAX_READING_AGE, DEFAULT_MAX_READING_AGE)),
-                CONF_MIN_PROXIES: user_input.get(CONF_MIN_PROXIES, signal_params.get(CONF_MIN_PROXIES, DEFAULT_MIN_PROXIES)),
+                CONF_TX_POWER: user_input[CONF_TX_POWER],
+                CONF_PATH_LOSS_EXPONENT: user_input[CONF_PATH_LOSS_EXPONENT],
+                CONF_RSSI_SMOOTHING: user_input[CONF_RSSI_SMOOTHING],
+                CONF_POSITION_SMOOTHING: user_input[CONF_POSITION_SMOOTHING],
+                CONF_MAX_READING_AGE: user_input[CONF_MAX_READING_AGE],
+                CONF_MIN_PROXIES: user_input[CONF_MIN_PROXIES],
             }
             updated_data[CONF_SIGNAL_PARAMETERS] = updated_signal_params
 
             # Update the config entry
             self.hass.config_entries.async_update_entry(
-                self._config_entry, data=updated_data
+                self.config_entry, data=updated_data
             )
-            
+
             return self.async_create_entry(title="", data={})
 
-        # Get current values from config entry
-        service_enabled = self.config_data.get(CONF_SERVICE_ENABLED, True)
-        mqtt_topic = self.config_data.get(CONF_MQTT_TOPIC, DEFAULT_MQTT_TOPIC_PREFIX)
+        # Get current signal parameters
         signal_params = self.config_data.get(CONF_SIGNAL_PARAMETERS, {})
 
         return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_SERVICE_ENABLED, default=service_enabled): bool,
-                    vol.Required(CONF_MQTT_TOPIC, default=mqtt_topic): cv.string,
-                    vol.Required(
-                        CONF_TX_POWER, 
-                        default=signal_params.get(CONF_TX_POWER, DEFAULT_TX_POWER)
-                    ): vol.All(vol.Coerce(int), vol.Range(min=-100, max=0)),
-                    vol.Required(
-                        CONF_PATH_LOSS_EXPONENT, 
-                        default=signal_params.get(CONF_PATH_LOSS_EXPONENT, DEFAULT_PATH_LOSS_EXPONENT)
-                    ): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=5.0)),
-                    vol.Required(
-                        CONF_RSSI_SMOOTHING, 
-                        default=signal_params.get(CONF_RSSI_SMOOTHING, DEFAULT_RSSI_SMOOTHING)
-                    ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
-                    vol.Required(
-                        CONF_POSITION_SMOOTHING, 
-                        default=signal_params.get(CONF_POSITION_SMOOTHING, DEFAULT_POSITION_SMOOTHING)
-                    ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
-                    vol.Required(
-                        CONF_MAX_READING_AGE, 
-                        default=signal_params.get(CONF_MAX_READING_AGE, DEFAULT_MAX_READING_AGE)
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=300)),
-                    vol.Required(
-                        CONF_MIN_PROXIES, 
-                        default=signal_params.get(CONF_MIN_PROXIES, DEFAULT_MIN_PROXIES)
-                    ): vol.All(vol.Coerce(int), vol.Range(min=2, max=10)),
-                }
-            ),
+            step_id="signal_parameters",
+            data_schema=vol.Schema({
+                vol.Required(
+                    CONF_TX_POWER,
+                    default=signal_params.get(CONF_TX_POWER, DEFAULT_TX_POWER)
+                ): vol.All(vol.Coerce(int), vol.Range(min=-100, max=0)),
+                vol.Required(
+                    CONF_PATH_LOSS_EXPONENT,
+                    default=signal_params.get(CONF_PATH_LOSS_EXPONENT, DEFAULT_PATH_LOSS_EXPONENT)
+                ): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=5.0)),
+                vol.Required(
+                    CONF_RSSI_SMOOTHING,
+                    default=signal_params.get(CONF_RSSI_SMOOTHING, DEFAULT_RSSI_SMOOTHING)
+                ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
+                vol.Required(
+                    CONF_POSITION_SMOOTHING,
+                    default=signal_params.get(CONF_POSITION_SMOOTHING, DEFAULT_POSITION_SMOOTHING)
+                ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
+                vol.Required(
+                    CONF_MAX_READING_AGE,
+                    default=signal_params.get(CONF_MAX_READING_AGE, DEFAULT_MAX_READING_AGE)
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=300)),
+                vol.Required(
+                    CONF_MIN_PROXIES,
+                    default=signal_params.get(CONF_MIN_PROXIES, DEFAULT_MIN_PROXIES)
+                ): vol.All(vol.Coerce(int), vol.Range(min=2, max=10)),
+            }),
             errors=errors,
         )

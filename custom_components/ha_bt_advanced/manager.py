@@ -534,16 +534,41 @@ class TriangulationManager:
                 return
                 
             proxy_id = topic_parts[-1]
-            
+
+            # Parse payload first
+            payload = json.loads(msg.payload)
+            if not isinstance(payload, dict):
+                return
+
             # Update proxy last seen timestamp
             current_time = time.time()
             self._proxy_last_seen[proxy_id] = current_time
-            
+
+            # Auto-detect new proxy if not already known
+            if proxy_id not in self.proxies:
+                _LOGGER.info(f"Auto-detected new proxy: {proxy_id}")
+                # Try to get coordinates from payload or use home coordinates as default
+                latitude = self.hass.config.latitude
+                longitude = self.hass.config.longitude
+
+                # Check if payload contains proxy location
+                if "proxy_location" in payload:
+                    loc = payload["proxy_location"]
+                    if isinstance(loc, dict):
+                        latitude = loc.get("latitude", latitude)
+                        longitude = loc.get("longitude", longitude)
+
+                # Add the proxy automatically
+                await self.add_proxy(proxy_id, latitude, longitude)
+
+                # Log that a new proxy was auto-detected
+                _LOGGER.info(f"Added auto-detected proxy {proxy_id} at ({latitude}, {longitude})")
+
             # Clear any offline notifications for this proxy
             notification_id = NOTIFICATION_PROXY_OFFLINE.format(proxy_id)
             if notification_id in self._proxy_offline_notifications:
                 del self._proxy_offline_notifications[notification_id]
-                
+
                 # Fire event for proxy coming back online
                 self.hass.bus.async_fire(
                     EVENT_PROXY_STATUS_CHANGE,
@@ -553,11 +578,6 @@ class TriangulationManager:
                         ATTR_LAST_SEEN: current_time,
                     }
                 )
-                
-            # Parse payload
-            payload = json.loads(msg.payload)
-            if not isinstance(payload, dict):
-                return
                 
             beacon_mac = payload.get(ATTR_BEACON_MAC)
             rssi = payload.get(ATTR_RSSI)
@@ -608,25 +628,10 @@ class TriangulationManager:
             if notification_id in self._beacon_missing_notifications:
                 del self._beacon_missing_notifications[notification_id]
             
-            # Check if this is a new beacon
+            # Only process onboarded beacons
             if mac not in self.beacons:
-                beacon_name = f"Beacon {mac[-6:]}"
-                _LOGGER.info(f"Discovered new beacon: {mac}")
-                await self.add_beacon(
-                    mac_address=mac,
-                    name=beacon_name,
-                    category=BEACON_CATEGORY_ITEM,
-                )
-                
-                # Create notification for new beacon
-                notification_id = NOTIFICATION_NEW_BEACON.format(mac)
-                async_create_notification(
-                    self.hass,
-                    f"A new beacon with MAC address {mac} has been discovered. "
-                    f"You can configure it in the HA-BT-Advanced panel.",
-                    title="New BLE Beacon Discovered",
-                    notification_id=notification_id,
-                )
+                _LOGGER.debug(f"Ignoring non-onboarded beacon: {mac}")
+                return
                 
             # Update beacon tracker
             if mac not in self._trackers:

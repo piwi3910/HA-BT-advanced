@@ -23,19 +23,79 @@
   "options": {
     "step": {
       "init": {
-        "title": "HA-BT-Advanced Options",
-        "description": "Configure BLE Triangulation Parameters",
+        "title": "HA-BT-Advanced Configuration",
+        "description": "Manage beacons, proxies and signal parameters",
+        "menu_options": {
+          "beacons": "Manage Beacons",
+          "proxies": "View Proxies",
+          "discovery": "Discover New Beacons",
+          "signal_parameters": "Signal Parameters"
+        }
+      },
+      "beacons": {
+        "title": "Manage Beacons",
+        "description": "Currently tracking {beacon_count} beacon(s)\n\n{beacon_list}",
         "data": {
-          "service_enabled": "Enable Triangulation Service",
+          "add_beacon": "Add new beacon (start discovery)",
+          "beacon_to_delete": "Select beacon to delete"
+        }
+      },
+      "confirm_delete_beacon": {
+        "title": "Delete Beacon",
+        "description": "Are you sure you want to delete beacon {beacon_mac}? This will stop tracking this beacon.",
+        "data": {
+          "confirm": "Confirm deletion"
+        }
+      },
+      "proxies": {
+        "title": "BLE Proxies",
+        "description": "Detected {proxy_count} proxy(ies)\n\n{proxy_list}\n\n{info}",
+        "data": {}
+      },
+      "discovery": {
+        "title": "Beacon Discovery",
+        "description": "{info}",
+        "data": {
+          "start_discovery": "Start 60-second discovery"
+        }
+      },
+      "discovered_beacons": {
+        "title": "Discovered Beacons",
+        "description": "Found {beacon_count} new beacon(s). Select one to onboard:",
+        "data": {
+          "beacon_to_onboard": "Select beacon"
+        },
+        "data_description": {
+          "info": "{info}"
+        }
+      },
+      "onboard_beacon": {
+        "title": "Onboard Beacon",
+        "description": "Configure beacon {beacon_mac}",
+        "data": {
+          "name": "Friendly name",
+          "category": "Beacon category",
+          "icon": "Icon (e.g., mdi:key)",
+          "notifications": "Enable notifications",
+          "precision": "Tracking precision"
+        }
+      },
+      "signal_parameters": {
+        "title": "Signal Parameters",
+        "description": "Fine-tune signal processing for your environment",
+        "data": {
           "tx_power": "TX Power at 1m (dBm)",
           "path_loss_exponent": "Path Loss Exponent",
-          "rssi_smoothing": "RSSI Smoothing Factor (0-1)",
-          "position_smoothing": "Position Smoothing Factor (0-1)",
+          "rssi_smoothing": "RSSI Smoothing Factor",
+          "position_smoothing": "Position Smoothing Factor",
           "max_reading_age": "Max Reading Age (seconds)",
-          "min_proxies": "Minimum Proxies for Triangulation",
-          "mqtt_topic": "MQTT Topic Prefix"
+          "min_proxies": "Minimum Proxies"
         }
       }
+    },
+    "error": {
+      "no_beacons_found": "No beacons discovered",
+      "onboarding_failed": "Failed to onboard beacon"
     }
   },
   "entity": {

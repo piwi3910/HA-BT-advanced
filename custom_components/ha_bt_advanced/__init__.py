@@ -14,9 +14,6 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, ServiceCall
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.components.http import StaticPathConfig
-from homeassistant.components import frontend
-from homeassistant.components.panel_custom import async_register_panel
 
 from .const import (
     DOMAIN,
@@ -357,37 +354,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Load the platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    # Register the configuration panel
-    await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                f"/ha_bt_advanced_panel/{entry.entry_id}",
-                str(Path(__file__).parent / "panel"),
-                False,
-            )
-        ]
-    )
-
-    # Register the panel using the correct API (following HACS pattern)
-    # Note: async_register_built_in_panel is not a coroutine, don't await it
-    frontend.async_register_built_in_panel(
-        hass,
-        component_name="custom",
-        sidebar_title="BT Advanced",
-        sidebar_icon="mdi:bluetooth",
-        frontend_url_path=f"ha-bt-advanced-{entry.entry_id}",
-        config={
-            "entry_id": entry.entry_id,
-            "_panel_custom": {
-                "name": "ha-bt-advanced-panel",
-                "embed_iframe": True,  # Changed to true to isolate the panel
-                "trust_external": True,  # Allow loading external resources
-                "js_url": f"/ha_bt_advanced_panel/{entry.entry_id}/ha-bt-advanced-panel.js",
-            }
-        },
-        require_admin=False,
-    )
 
     return True
 
