@@ -148,8 +148,10 @@ class DiscoveryManager:
             self._stop_discovery()
             return False
 
-        # Apply proximity filter
+        # Apply proximity filter (more negative = weaker signal)
+        # We want to KEEP beacons with RSSI greater than threshold (closer)
         if rssi < self.beacon_filters['min_rssi']:
+            _LOGGER.debug(f"Beacon {mac_upper} filtered out: RSSI {rssi} is weaker than threshold {self.beacon_filters['min_rssi']}")
             return False
 
         # Apply UUID filters

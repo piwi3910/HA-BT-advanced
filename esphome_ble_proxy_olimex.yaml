@@ -79,111 +79,119 @@ esp32_ble_tracker:
             }
 
             // Process Eddystone advertisements (check independently from iBeacon)
-            if (x.get_service_data_uuid() == esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
-              // Eddystone uses service UUID 0xFEAA
-              auto data = x.get_service_data();
+            // Check for Eddystone service UUID 0xFEAA
+            for (auto &service_data : x.get_service_datas()) {
+              if (service_data.uuid == esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
+                // Eddystone uses service UUID 0xFEAA
+                auto data = service_data.data;
 
-              if (data.size() > 0) {
-                uint8_t frame_type = data[0];
+                if (data.size() > 0) {
+                  uint8_t frame_type = data[0];
 
-                // Eddystone-UID (0x00)
-                if (frame_type == 0x00 && data.size() >= 20) {
-                  payload += ",\"frame_type\":\"eddystone-uid\"";
-                  payload += ",\"tx_power\":" + std::to_string((int8_t)data[1]);
+                  // Eddystone-UID (0x00)
+                  if (frame_type == 0x00 && data.size() >= 20) {
+                    payload = "{";
+                    payload += "\"proxy_id\":\"${proxy_id}\",";
+                    payload += "\"beacon_mac\":\"" + mac_address + "\",";
+                    payload += "\"rssi\":" + std::to_string(rssi);
+                    payload += ",\"frame_type\":\"eddystone-uid\"";
+                    payload += ",\"tx_power\":" + std::to_string((int8_t)data[1]);
 
-                  // Extract namespace (10 bytes)
-                  char namespace_hex[21];
-                  sprintf(namespace_hex, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-                    data[2], data[3], data[4], data[5], data[6],
-                    data[7], data[8], data[9], data[10], data[11]);
-                  payload += ",\"eddystone_namespace\":\"" + std::string(namespace_hex) + "\"";
+                    // Extract namespace (10 bytes)
+                    char namespace_hex[21];
+                    sprintf(namespace_hex, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+                      data[2], data[3], data[4], data[5], data[6],
+                      data[7], data[8], data[9], data[10], data[11]);
+                    payload += ",\"eddystone_namespace\":\"" + std::string(namespace_hex) + "\"";
 
-                  // Extract instance (6 bytes)
-                  char instance_hex[13];
-                  sprintf(instance_hex, "%02x%02x%02x%02x%02x%02x",
-                    data[12], data[13], data[14], data[15], data[16], data[17]);
-                  payload += ",\"eddystone_instance\":\"" + std::string(instance_hex) + "\"";
+                    // Extract instance (6 bytes)
+                    char instance_hex[13];
+                    sprintf(instance_hex, "%02x%02x%02x%02x%02x%02x",
+                      data[12], data[13], data[14], data[15], data[16], data[17]);
+                    payload += ",\"eddystone_instance\":\"" + std::string(instance_hex) + "\"";
 
-                  payload += "}";
-                  id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
-                  ESP_LOGD("ble_tracker", "Published Eddystone-UID: %s", payload.c_str());
-                }
-                // Eddystone-TLM (0x20) - Telemetry data
-                else if (frame_type == 0x20 && data.size() >= 14) {
-                  payload += ",\"frame_type\":\"eddystone-tlm\"";
-
-                  // TLM version
-                  uint8_t tlm_version = data[1];
-                  payload += ",\"tlm_version\":" + std::to_string(tlm_version);
-
-                  if (tlm_version == 0x00) {  // Unencrypted TLM
-                    // Battery voltage in mV (2 bytes, big endian)
-                    uint16_t battery_mv = (data[2] << 8) | data[3];
-                    payload += ",\"battery_voltage\":" + std::to_string(battery_mv);
-
-                    // Temperature in 8.8 fixed point format (2 bytes, big endian)
-                    int16_t temp_raw = (data[4] << 8) | data[5];
-                    float temperature = temp_raw / 256.0;
-                    payload += ",\"temperature\":" + std::to_string(temperature);
-
-                    // Advertising PDU count (4 bytes, big endian)
-                    uint32_t pdu_count = (data[6] << 24) | (data[7] << 16) | (data[8] << 8) | data[9];
-                    payload += ",\"packet_count\":" + std::to_string(pdu_count);
-
-                    // Time since power-on in 0.1 second units (4 bytes, big endian)
-                    uint32_t time_units = (data[10] << 24) | (data[11] << 16) | (data[12] << 8) | data[13];
-                    uint32_t uptime_seconds = time_units / 10;
-                    payload += ",\"uptime_seconds\":" + std::to_string(uptime_seconds);
+                    payload += "}";
+                    id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+                    ESP_LOGD("ble_tracker", "Published Eddystone-UID: %s", payload.c_str());
                   }
+                  // Eddystone-TLM (0x20) - Telemetry data
+                  else if (frame_type == 0x20 && data.size() >= 14) {
+                    payload = "{";
+                    payload += "\"proxy_id\":\"${proxy_id}\",";
+                    payload += "\"beacon_mac\":\"" + mac_address + "\",";
+                    payload += "\"rssi\":" + std::to_string(rssi);
+                    payload += ",\"frame_type\":\"eddystone-tlm\"";
 
-                  payload += "}";
-                  id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
-                  ESP_LOGD("ble_tracker", "Published Eddystone-TLM: %s", payload.c_str());
-                }
-                // Eddystone-URL (0x10)
-                else if (frame_type == 0x10 && data.size() >= 3) {
-                  payload += ",\"frame_type\":\"eddystone-url\"";
-                  payload += ",\"tx_power\":" + std::to_string((int8_t)data[1]);
+                    // TLM version
+                    uint8_t tlm_version = data[1];
+                    payload += ",\"tlm_version\":" + std::to_string(tlm_version);
 
-                  // URL scheme prefix
-                  const char* url_schemes[] = {"http://www.", "https://www.", "http://", "https://"};
-                  uint8_t scheme = data[2];
-                  std::string url = "";
+                    if (tlm_version == 0x00) {  // Unencrypted TLM
+                      // Battery voltage in mV (2 bytes, big endian)
+                      uint16_t battery_mv = (data[2] << 8) | data[3];
+                      payload += ",\"battery_voltage\":" + std::to_string(battery_mv);
 
-                  if (scheme < 4) {
-                    url = url_schemes[scheme];
-                  }
+                      // Temperature in 8.8 fixed point format (2 bytes, big endian)
+                      int16_t temp_raw = (data[4] << 8) | data[5];
+                      float temperature = temp_raw / 256.0;
+                      payload += ",\"temperature\":" + std::to_string(temperature);
 
-                  // Decode URL
-                  for (size_t i = 3; i < data.size(); i++) {
-                    uint8_t byte = data[i];
-                    if (byte < 14) {
-                      // Special expansion codes
-                      const char* expansions[] = {
-                        ".com/", ".org/", ".edu/", ".net/", ".info/", ".biz/",
-                        ".gov/", ".com", ".org", ".edu", ".net", ".info", ".biz", ".gov"
-                      };
-                      url += expansions[byte];
-                    } else if (byte >= 32 && byte <= 126) {
-                      // Printable ASCII
-                      url += (char)byte;
+                      // Advertising PDU count (4 bytes, big endian)
+                      uint32_t pdu_count = (data[6] << 24) | (data[7] << 16) | (data[8] << 8) | data[9];
+                      payload += ",\"packet_count\":" + std::to_string(pdu_count);
+
+                      // Time since power-on in 0.1 second units (4 bytes, big endian)
+                      uint32_t time_units = (data[10] << 24) | (data[11] << 16) | (data[12] << 8) | data[13];
+                      uint32_t uptime_seconds = time_units / 10;
+                      payload += ",\"uptime_seconds\":" + std::to_string(uptime_seconds);
                     }
+
+                    payload += "}";
+                    id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+                    ESP_LOGD("ble_tracker", "Published Eddystone-TLM: %s", payload.c_str());
                   }
+                  // Eddystone-URL (0x10)
+                  else if (frame_type == 0x10 && data.size() >= 3) {
+                    payload = "{";
+                    payload += "\"proxy_id\":\"${proxy_id}\",";
+                    payload += "\"beacon_mac\":\"" + mac_address + "\",";
+                    payload += "\"rssi\":" + std::to_string(rssi);
+                    payload += ",\"frame_type\":\"eddystone-url\"";
+                    payload += ",\"tx_power\":" + std::to_string((int8_t)data[1]);
 
-                  payload += ",\"eddystone_url\":\"" + url + "\"";
-                  payload += "}";
-                  id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
-                  ESP_LOGD("ble_tracker", "Published Eddystone-URL: %s", payload.c_str());
+                    // URL scheme prefix
+                    const char* url_schemes[] = {"http://www.", "https://www.", "http://", "https://"};
+                    uint8_t scheme = data[2];
+                    std::string url = "";
+
+                    if (scheme < 4) {
+                      url = url_schemes[scheme];
+                    }
+
+                    // Decode URL
+                    for (size_t i = 3; i < data.size(); i++) {
+                      uint8_t byte = data[i];
+                      if (byte < 14) {
+                        // Special expansion codes
+                        const char* expansions[] = {
+                          ".com/", ".org/", ".edu/", ".net/", ".info/", ".biz/",
+                          ".gov/", ".com", ".org", ".edu", ".net", ".info", ".biz", ".gov"
+                        };
+                        url += expansions[byte];
+                      } else if (byte >= 32 && byte <= 126) {
+                        // Printable ASCII
+                        url += (char)byte;
+                      }
+                    }
+
+                    payload += ",\"eddystone_url\":\"" + url + "\"";
+                    payload += "}";
+                    id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+                    ESP_LOGD("ble_tracker", "Published Eddystone-URL: %s", payload.c_str());
+                  }
                 }
+                break; // Found Eddystone, no need to check other service data
               }
-            }
-
-            // Log unhandled advertisement types for debugging
-            // Note: A beacon may send multiple frame types (iBeacon, Eddystone, etc.)
-            // so we only log if NONE of the above matched
-            if (!x.get_ibeacon().has_value() &&
-                x.get_service_data_uuid() != esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
-              ESP_LOGV("ble_tracker", "Unhandled advertisement type from %s", mac_address.c_str());
             }
 
 # Sensors to monitor system health

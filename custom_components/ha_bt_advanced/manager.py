@@ -636,10 +636,14 @@ class TriangulationManager:
             }
 
             # Check if beacon should be processed
-            if not self.discovery_manager.should_process_beacon(beacon_mac, rssi, beacon_data):
-                # If in discovery mode, add to discovered beacons
-                if self.discovery_manager.discovery_mode:
-                    self.discovery_manager.process_discovery_beacon(beacon_mac, rssi, beacon_data, proxy_id)
+            should_process = self.discovery_manager.should_process_beacon(beacon_mac, rssi, beacon_data)
+
+            # If in discovery mode and beacon passes filters, add to discovered beacons
+            if self.discovery_manager.discovery_mode and should_process:
+                self.discovery_manager.process_discovery_beacon(beacon_mac, rssi, beacon_data, proxy_id)
+
+            # If beacon should not be processed normally (not onboarded), return
+            if not should_process:
                 return
 
             # Parse timestamp or use current time

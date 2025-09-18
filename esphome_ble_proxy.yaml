@@ -119,9 +119,11 @@ esp32_ble_tracker:
             }
 
             // Process Eddystone advertisements (check independently from iBeacon)
-            if (x.get_service_data_uuid() == esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
-              // Eddystone uses service UUID 0xFEAA
-              auto data = x.get_service_data();
+            // Check for Eddystone service UUID 0xFEAA
+            for (auto &service_data : x.get_service_datas()) {
+              if (service_data.uuid == esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
+                // Eddystone uses service UUID 0xFEAA
+                auto data = service_data.data;
 
               if (data.size() > 0) {
                 uint8_t frame_type = data[0];
@@ -215,15 +217,25 @@ esp32_ble_tracker:
                   id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
                   ESP_LOGD("ble_tracker", "Published Eddystone-URL: %s", payload.c_str());
                 }
+                break; // Found Eddystone, no need to check other service data
               }
             }
 
             // Log unhandled advertisement types for debugging
             // Note: A beacon may send multiple frame types (iBeacon, Eddystone, etc.)
             // so we only log if NONE of the above matched
-            if (!x.get_ibeacon().has_value() &&
-                x.get_service_data_uuid() != esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
-              ESP_LOGV("ble_tracker", "Unhandled advertisement type from %s", mac_address.c_str());
+            // Log unhandled advertisement types (simplified check)
+            if (!x.get_ibeacon().has_value()) {
+              bool has_eddystone = false;
+              for (auto &service_data : x.get_service_datas()) {
+                if (service_data.uuid == esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
+                  has_eddystone = true;
+                  break;
+                }
+              }
+              if (!has_eddystone) {
+                ESP_LOGV("ble_tracker", "Unhandled advertisement type from %s", mac_address.c_str());
+              }
             }
 
 # Time component to provide accurate timestamps
