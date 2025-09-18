@@ -18,9 +18,36 @@ class HABTAdvancedPanel extends HTMLElement {
     this._hass = hass;
     if (!this.shadowRoot.innerHTML) {
       this.render();
-      this.setupMap();
-      this.loadData();
+      // Wait for Leaflet to load before setting up the map
+      this.waitForLeaflet().then(() => {
+        this.setupMap();
+        this.loadData();
+      });
     }
+  }
+
+  async waitForLeaflet() {
+    // If Leaflet is already loaded, return immediately
+    if (window.L) {
+      return;
+    }
+
+    // Wait for Leaflet to be loaded
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        if (window.L) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 100);
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        console.error('Leaflet failed to load');
+        resolve(); // Resolve anyway to prevent hanging
+      }, 10000);
+    });
   }
 
   render() {
@@ -37,8 +64,8 @@ class HABTAdvancedPanel extends HTMLElement {
         }
         .sidebar {
           width: 350px;
-          background: var(--card-background-color);
-          border-right: 1px solid var(--divider-color);
+          background: var(--card-background-color, #fff);
+          border-right: 1px solid var(--divider-color, #e0e0e0);
           overflow-y: auto;
           padding: 16px;
         }
@@ -50,6 +77,8 @@ class HABTAdvancedPanel extends HTMLElement {
           width: 100%;
           height: 100%;
         }
+        /* Leaflet styles for shadow DOM */
+        @import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
         .toolbar {
           position: absolute;
           top: 10px;
@@ -349,19 +378,26 @@ class HABTAdvancedPanel extends HTMLElement {
     // Initialize Leaflet map
     const mapElement = this.shadowRoot.getElementById('map');
 
+    // Check if map element exists
+    if (!mapElement) {
+      console.error('Map element not found');
+      return;
+    }
+
     // Get Home Assistant's home location
     const homeLocation = [
       this._hass.config.latitude || 37.7749,
       this._hass.config.longitude || -122.4194
     ];
 
-    // Create map
-    this.map = L.map(mapElement).setView(homeLocation, 18);
+    try {
+      // Create map
+      this.map = L.map(mapElement).setView(homeLocation, 18);
 
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(this.map);
+      // Add OpenStreetMap tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(this.map);
 
     // Add home marker
     L.marker(homeLocation, {
@@ -376,14 +412,17 @@ class HABTAdvancedPanel extends HTMLElement {
       })
     }).addTo(this.map).bindPopup('Home');
 
-    // Handle map clicks
-    this.map.on('click', (e) => {
-      if (this.selectedTool === 'add-proxy') {
-        this.showProxyModal(e.latlng.lat, e.latlng.lng);
-      } else if (this.selectedTool === 'draw-zone') {
-        this.addZonePoint(e.latlng);
-      }
-    });
+      // Handle map clicks
+      this.map.on('click', (e) => {
+        if (this.selectedTool === 'add-proxy') {
+          this.showProxyModal(e.latlng.lat, e.latlng.lng);
+        } else if (this.selectedTool === 'draw-zone') {
+          this.addZonePoint(e.latlng);
+        }
+      });
+    } catch (error) {
+      console.error('Error initializing map:', error);
+    }
   }
 
   setupEventListeners() {

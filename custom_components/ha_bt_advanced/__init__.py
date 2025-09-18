@@ -279,9 +279,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "entry_id": entry.entry_id,
             "_panel_custom": {
                 "name": "ha-bt-advanced-panel",
-                "embed_iframe": False,
-                "trust_external": False,
-                "module_url": f"/ha_bt_advanced_panel/{entry.entry_id}/ha-bt-advanced-panel.js",
+                "embed_iframe": True,  # Changed to true to isolate the panel
+                "trust_external": True,  # Allow loading external resources
+                "js_url": f"/ha_bt_advanced_panel/{entry.entry_id}/ha-bt-advanced-panel.js",
             }
         },
         require_admin=False,
