@@ -62,6 +62,7 @@ class BeaconTracker:
         self.name = name
         self.tx_power = tx_power
         self.path_loss_exponent = path_loss_exponent
+        self.rssi_smoothing = rssi_smoothing
         self.max_reading_age = max_reading_age
         self.position_smoothing = position_smoothing
         self.icon = icon

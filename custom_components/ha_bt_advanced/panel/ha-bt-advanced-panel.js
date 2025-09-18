@@ -758,31 +758,72 @@ class HABTAdvancedPanel extends HTMLElement {
   setupModalHandlers() {
     // Proxy modal
     const proxyModal = this.shadowRoot.getElementById('proxy-modal');
-    this.shadowRoot.getElementById('proxy-cancel').addEventListener('click', () => {
-      proxyModal.style.display = 'none';
-    });
-    this.shadowRoot.getElementById('proxy-save').addEventListener('click', () => {
-      this.saveProxy();
-    });
+    const proxyCancelBtn = this.shadowRoot.getElementById('proxy-cancel');
+    const proxySaveBtn = this.shadowRoot.getElementById('proxy-save');
+    if (proxyCancelBtn) {
+      proxyCancelBtn.addEventListener('click', () => {
+        proxyModal.style.display = 'none';
+      });
+    }
+    if (proxySaveBtn) {
+      proxySaveBtn.addEventListener('click', () => {
+        this.saveProxy();
+      });
+    }
 
-    // Beacon modal
-    const beaconModal = this.shadowRoot.getElementById('beacon-modal');
-    this.shadowRoot.getElementById('beacon-cancel').addEventListener('click', () => {
-      beaconModal.style.display = 'none';
-    });
-    this.shadowRoot.getElementById('beacon-save').addEventListener('click', () => {
-      this.saveBeacon();
-    });
+    // Onboard modal
+    const onboardModal = this.shadowRoot.getElementById('onboard-modal');
+    const onboardCancelBtn = this.shadowRoot.getElementById('onboard-cancel');
+    const onboardSaveBtn = this.shadowRoot.getElementById('onboard-save');
+    if (onboardCancelBtn) {
+      onboardCancelBtn.addEventListener('click', () => {
+        onboardModal.style.display = 'none';
+      });
+    }
+    if (onboardSaveBtn) {
+      onboardSaveBtn.addEventListener('click', () => {
+        this.onboardBeacon();
+      });
+    }
+
+    // Bulk onboard modal
+    const bulkModal = this.shadowRoot.getElementById('bulk-onboard-modal');
+    const bulkCancelBtn = this.shadowRoot.getElementById('bulk-cancel');
+    const bulkSaveBtn = this.shadowRoot.getElementById('bulk-save');
+    if (bulkCancelBtn) {
+      bulkCancelBtn.addEventListener('click', () => {
+        bulkModal.style.display = 'none';
+      });
+    }
+    if (bulkSaveBtn) {
+      bulkSaveBtn.addEventListener('click', () => {
+        this.bulkOnboardBeacons();
+      });
+    }
 
     // Zone modal
     const zoneModal = this.shadowRoot.getElementById('zone-modal');
-    this.shadowRoot.getElementById('zone-cancel').addEventListener('click', () => {
-      zoneModal.style.display = 'none';
-      this.clearZoneDrawing();
-    });
-    this.shadowRoot.getElementById('zone-save').addEventListener('click', () => {
-      this.saveZone();
-    });
+    const zoneCancelBtn = this.shadowRoot.getElementById('zone-cancel');
+    const zoneSaveBtn = this.shadowRoot.getElementById('zone-save');
+    if (zoneCancelBtn) {
+      zoneCancelBtn.addEventListener('click', () => {
+        zoneModal.style.display = 'none';
+        this.clearZoneDrawing();
+      });
+    }
+    if (zoneSaveBtn) {
+      zoneSaveBtn.addEventListener('click', () => {
+        this.saveZone();
+      });
+    }
+
+    // Virtual user creation button
+    const createVirtualBtn = this.shadowRoot.getElementById('create-virtual-btn');
+    if (createVirtualBtn) {
+      createVirtualBtn.addEventListener('click', () => {
+        this.createVirtualUser();
+      });
+    }
   }
 
   selectTool(tool) {
@@ -1311,70 +1352,69 @@ class HABTAdvancedPanel extends HTMLElement {
 
     modal.style.display = 'flex';
 
-    // Setup modal handlers
-    const cancelBtn = this.shadowRoot.getElementById('onboard-cancel');
-    const saveBtn = this.shadowRoot.getElementById('onboard-save');
-    const createVirtualBtn = this.shadowRoot.getElementById('create-virtual-btn');
+    // Store current beacon for the onboardBeacon method
+    this.currentBeaconToOnboard = beacon;
+  }
 
-    cancelBtn.onclick = () => modal.style.display = 'none';
+  async onboardBeacon() {
+    const beacon = this.currentBeaconToOnboard;
+    if (!beacon) return;
 
-    saveBtn.onclick = async () => {
-      const name = this.shadowRoot.getElementById('onboard-name').value.trim();
-      if (!name) {
-        alert('Please enter a name for the beacon');
-        return;
+    const name = this.shadowRoot.getElementById('onboard-name').value.trim();
+    if (!name) {
+      alert('Please enter a name for the beacon');
+      return;
+    }
+
+    try {
+      await this._hass.callService('ha_bt_advanced', 'onboard_beacon', {
+        mac_address: beacon.mac,
+        name: name,
+        owner: this.shadowRoot.getElementById('onboard-owner').value || undefined,
+        beacon_category: this.shadowRoot.getElementById('onboard-category').value,
+        beacon_icon: this.shadowRoot.getElementById('onboard-icon').value || undefined,
+        notifications_enabled: this.shadowRoot.getElementById('onboard-notifications').checked,
+        tracking_precision: this.shadowRoot.getElementById('onboard-precision').value
+      });
+
+      this.shadowRoot.getElementById('onboard-modal').style.display = 'none';
+      alert(`Successfully onboarded ${name}`);
+
+      // Refresh beacon list
+      await this.loadBeacons();
+
+      // Remove from discovered list
+      this.discoveredBeacons = this.discoveredBeacons.filter(b => b.mac !== beacon.mac);
+      this.updateDiscoveredList();
+    } catch (error) {
+      console.error('Error onboarding beacon:', error);
+      alert('Failed to onboard beacon: ' + error.message);
+    }
+  }
+
+  async createVirtualUser() {
+    const name = this.shadowRoot.getElementById('virtual-user-name').value.trim();
+    if (!name) {
+      alert('Please enter a name for the virtual user');
+      return;
+    }
+
+    try {
+      const result = await this._hass.callService('ha_bt_advanced', 'create_virtual_user', {
+        name: name
+      }, true);
+
+      if (result && result.user_id) {
+        // Reload users and select the new one
+        await this.loadUsers();
+        this.shadowRoot.getElementById('onboard-owner').value = result.user_id;
+        this.shadowRoot.getElementById('virtual-user-name').value = '';
+        alert(`Created virtual user: ${name}`);
       }
-
-      try {
-        await this._hass.callService('ha_bt_advanced', 'onboard_beacon', {
-          mac_address: beacon.mac,
-          name: name,
-          owner: this.shadowRoot.getElementById('onboard-owner').value || undefined,
-          beacon_category: this.shadowRoot.getElementById('onboard-category').value,
-          beacon_icon: this.shadowRoot.getElementById('onboard-icon').value || undefined,
-          notifications_enabled: this.shadowRoot.getElementById('onboard-notifications').checked,
-          tracking_precision: this.shadowRoot.getElementById('onboard-precision').value
-        });
-
-        modal.style.display = 'none';
-        alert(`Successfully onboarded ${name}`);
-
-        // Refresh beacon list
-        await this.loadBeacons();
-
-        // Remove from discovered list
-        this.discoveredBeacons = this.discoveredBeacons.filter(b => b.mac !== beacon.mac);
-        this.updateDiscoveredList();
-      } catch (error) {
-        console.error('Error onboarding beacon:', error);
-        alert('Failed to onboard beacon: ' + error.message);
-      }
-    };
-
-    createVirtualBtn.onclick = async () => {
-      const name = this.shadowRoot.getElementById('virtual-user-name').value.trim();
-      if (!name) {
-        alert('Please enter a name for the virtual user');
-        return;
-      }
-
-      try {
-        const result = await this._hass.callService('ha_bt_advanced', 'create_virtual_user', {
-          name: name
-        }, true);
-
-        if (result && result.user_id) {
-          // Reload users and select the new one
-          await this.loadUsers();
-          this.shadowRoot.getElementById('onboard-owner').value = result.user_id;
-          this.shadowRoot.getElementById('virtual-user-name').value = '';
-          alert(`Created virtual user: ${name}`);
-        }
-      } catch (error) {
-        console.error('Error creating virtual user:', error);
-        alert('Failed to create virtual user');
-      }
-    };
+    } catch (error) {
+      console.error('Error creating virtual user:', error);
+      alert('Failed to create virtual user');
+    }
   }
 
   showBulkOnboardModal() {
@@ -1408,64 +1448,62 @@ class HABTAdvancedPanel extends HTMLElement {
 
     modal.style.display = 'flex';
 
-    // Setup handlers
-    const cancelBtn = this.shadowRoot.getElementById('bulk-cancel');
-    const saveBtn = this.shadowRoot.getElementById('bulk-save');
+    // Store selected beacons for bulkOnboardBeacons method
+    this.currentBulkBeacons = selectedBeacons;
+  }
 
-    cancelBtn.onclick = () => modal.style.display = 'none';
+  async bulkOnboardBeacons() {
+    const namesEl = this.shadowRoot.getElementById('bulk-names');
+    const beacons = [];
+    let allNamesProvided = true;
 
-    saveBtn.onclick = async () => {
-      const beacons = [];
-      let allNamesProvided = true;
+    namesEl.querySelectorAll('.beacon-name-input').forEach(input => {
+      const name = input.value.trim();
+      if (!name) {
+        allNamesProvided = false;
+      } else {
+        beacons.push({
+          mac: input.dataset.mac,
+          name: name
+        });
+      }
+    });
 
-      namesEl.querySelectorAll('.beacon-name-input').forEach(input => {
-        const name = input.value.trim();
-        if (!name) {
-          allNamesProvided = false;
-        } else {
-          beacons.push({
-            mac: input.dataset.mac,
-            name: name
-          });
-        }
-      });
+    if (!allNamesProvided) {
+      alert('Please provide names for all beacons');
+      return;
+    }
 
-      if (!allNamesProvided) {
-        alert('Please provide names for all beacons');
-        return;
+    const owner = this.shadowRoot.getElementById('bulk-owner').value;
+    const category = this.shadowRoot.getElementById('bulk-category').value;
+    const notifications = this.shadowRoot.getElementById('bulk-notifications').checked;
+
+    try {
+      // Onboard each beacon
+      for (const beacon of beacons) {
+        await this._hass.callService('ha_bt_advanced', 'onboard_beacon', {
+          mac_address: beacon.mac,
+          name: beacon.name,
+          owner: owner || undefined,
+          beacon_category: category,
+          notifications_enabled: notifications,
+          tracking_precision: 'medium'
+        });
       }
 
-      const owner = this.shadowRoot.getElementById('bulk-owner').value;
-      const category = this.shadowRoot.getElementById('bulk-category').value;
-      const notifications = this.shadowRoot.getElementById('bulk-notifications').checked;
+      this.shadowRoot.getElementById('bulk-onboard-modal').style.display = 'none';
+      alert(`Successfully onboarded ${beacons.length} beacons`);
 
-      try {
-        // Onboard each beacon
-        for (const beacon of beacons) {
-          await this._hass.callService('ha_bt_advanced', 'onboard_beacon', {
-            mac_address: beacon.mac,
-            name: beacon.name,
-            owner: owner || undefined,
-            beacon_category: category,
-            notifications_enabled: notifications,
-            tracking_precision: 'medium'
-          });
-        }
+      // Clear selection
+      this.selectedBeaconsToOnboard.clear();
 
-        modal.style.display = 'none';
-        alert(`Successfully onboarded ${beacons.length} beacons`);
-
-        // Clear selection
-        this.selectedBeaconsToOnboard.clear();
-
-        // Refresh
-        await this.loadBeacons();
-        await this.pollDiscoveredBeacons();
-      } catch (error) {
-        console.error('Error onboarding beacons:', error);
-        alert('Failed to onboard some beacons');
-      }
-    };
+      // Refresh
+      await this.loadBeacons();
+      await this.pollDiscoveredBeacons();
+    } catch (error) {
+      console.error('Error onboarding beacons:', error);
+      alert('Failed to onboard some beacons');
+    }
   }
 
   async loadProxies() {
