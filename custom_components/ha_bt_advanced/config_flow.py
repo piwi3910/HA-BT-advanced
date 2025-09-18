@@ -1,5 +1,6 @@
 """Config flow for HA-BT-Advanced integration."""
 import logging
+import time
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -410,7 +411,7 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
                         duration=duration
                     )
                     if success:
-                        return self.async_show_progress_done(next_step_id="calibration_started")
+                        return await self.async_step_calibration_started()
                     else:
                         errors["base"] = "calibration_failed"
 
@@ -505,9 +506,13 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
                 if not manager:
                     manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
                 if manager:
-                    await manager.start_discovery(60)
-                    return await self.async_step_discovered_beacons()
-            else:
+                    success = await manager.start_discovery(60)
+                    if success:
+                        self._discovery_start_time = time.time()
+                        return await self.async_step_discovery_progress()
+                    else:
+                        errors["base"] = "discovery_failed"
+            elif user_input.get("back_to_menu"):
                 return await self.async_step_beacons()
 
         return self.async_show_form(
@@ -521,6 +526,55 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
                     "Discovery mode will scan for nearby BLE beacons for 60 seconds.\n"
                     "Only beacons within ~5 meters (RSSI > -70 dBm) will be detected.\n"
                     "Make sure your beacon is nearby and powered on."
+                ),
+            }
+        )
+
+    async def async_step_discovery_progress(self, user_input=None):
+        """Show discovery progress with countdown."""
+        if user_input is not None:
+            if user_input.get("check_results"):
+                return await self.async_step_discovered_beacons()
+            elif user_input.get("stop_discovery"):
+                # Stop discovery
+                manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get("manager")
+                if not manager:
+                    manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
+                if manager and manager.discovery_manager:
+                    manager.discovery_manager.stop_discovery()
+                return await self.async_step_beacons()
+
+        # Calculate remaining time
+        elapsed = time.time() - getattr(self, '_discovery_start_time', time.time())
+        remaining = max(0, 60 - int(elapsed))
+
+        # Get current discovered beacon count
+        manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get("manager")
+        if not manager:
+            manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
+
+        discovered_count = 0
+        if manager and manager.discovery_manager:
+            discovered_count = len(manager.discovery_manager.discovered_beacons)
+
+        if remaining <= 0:
+            # Auto-redirect to results when time is up
+            return await self.async_step_discovered_beacons()
+
+        return self.async_show_form(
+            step_id="discovery_progress",
+            data_schema=vol.Schema({
+                vol.Optional("check_results", default=False): cv.boolean,
+                vol.Optional("stop_discovery", default=False): cv.boolean,
+            }),
+            description_placeholders={
+                "info": (
+                    f"**Discovery in progress...**\n\n"
+                    f"⏱️ Time remaining: **{remaining} seconds**\n"
+                    f"📡 Beacons found so far: **{discovered_count}**\n\n"
+                    f"Place your beacon within 5 meters of a proxy.\n"
+                    f"The beacon needs to be detected at least 3 times.\n\n"
+                    f"This page will auto-refresh when discovery completes."
                 ),
             }
         )

@@ -985,10 +985,11 @@ class TriangulationManager:
                 
         _LOGGER.info("HA-BT-Advanced triangulation service started")
 
-    async def start_discovery(self, duration: int = 60) -> None:
+    async def start_discovery(self, duration: int = 60) -> bool:
         """Start beacon discovery mode."""
-        await self.discovery_manager.start_discovery(duration)
+        result = await self.discovery_manager.start_discovery(duration)
         _LOGGER.info(f"Discovery mode started for {duration} seconds")
+        return result
 
     def stop_discovery(self) -> None:
         """Stop beacon discovery mode."""

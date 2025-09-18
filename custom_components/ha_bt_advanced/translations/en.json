@@ -81,7 +81,16 @@
         "title": "Beacon Discovery",
         "description": "{info}",
         "data": {
-          "start_discovery": "Start 60-second discovery"
+          "start_discovery": "Start 60-second discovery",
+          "back_to_menu": "Back to menu"
+        }
+      },
+      "discovery_progress": {
+        "title": "Discovery in Progress",
+        "description": "{info}",
+        "data": {
+          "check_results": "Check results now",
+          "stop_discovery": "Stop discovery"
         }
       },
       "discovered_beacons": {

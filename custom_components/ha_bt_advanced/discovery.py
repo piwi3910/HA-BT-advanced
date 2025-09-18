@@ -53,7 +53,7 @@ class DiscoveryManager:
         }
         self.virtual_users: Dict[str, Dict[str, Any]] = {}
 
-    async def start_discovery(self, duration: int = 60) -> None:
+    async def start_discovery(self, duration: int = 60) -> bool:
         """Start discovery mode with proximity filter."""
         self.discovery_mode = True
         self.discovery_end_time = time.time() + duration
@@ -63,11 +63,17 @@ class DiscoveryManager:
         # Schedule auto-stop
         self.hass.loop.call_later(duration, self._stop_discovery)
 
+        return True
+
     def _stop_discovery(self) -> None:
         """Stop discovery mode."""
         self.discovery_mode = False
         self.discovery_end_time = None
         _LOGGER.info(f"Discovery mode ended. Found {len(self.discovered_beacons)} beacons")
+
+    def stop_discovery(self) -> None:
+        """Manually stop discovery mode."""
+        self._stop_discovery()
 
     def extend_discovery(self, additional_seconds: int = 30) -> None:
         """Extend discovery mode if user is actively using it."""
