@@ -14,7 +14,6 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, ServiceCall
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.components.frontend import async_register_web_panel, async_remove_panel
 from homeassistant.components.http import StaticPathConfig
 
 from .const import (
@@ -256,25 +255,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register the configuration panel
-    hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                f"/ha_bt_advanced_panel/{entry.entry_id}",
-                str(Path(__file__).parent / "panel"),
-                False,
-            )
-        ]
-    )
+    # Panel registration is temporarily disabled - needs update for HA 2025.12 API changes
+    # The frontend panel API has changed and needs to be updated
+    # TODO: Re-enable panel registration with new API
 
-    await async_register_web_panel(
-        hass,
-        component_name="custom",
-        sidebar_title="BT Advanced",
-        sidebar_icon="mdi:bluetooth",
-        frontend_url_path=f"ha-bt-advanced-{entry.entry_id}",
-        config={"entry_id": entry.entry_id},
-        module_url=f"/ha_bt_advanced_panel/{entry.entry_id}/ha-bt-advanced-panel.js",
-    )
+    # hass.http.async_register_static_paths(
+    #     [
+    #         StaticPathConfig(
+    #             f"/ha_bt_advanced_panel/{entry.entry_id}",
+    #             str(Path(__file__).parent / "panel"),
+    #             False,
+    #         )
+    #     ]
+    # )
+
+    # await async_register_web_panel(
+    #     hass,
+    #     component_name="custom",
+    #     sidebar_title="BT Advanced",
+    #     sidebar_icon="mdi:bluetooth",
+    #     frontend_url_path=f"ha-bt-advanced-{entry.entry_id}",
+    #     config={"entry_id": entry.entry_id},
+    #     module_url=f"/ha_bt_advanced_panel/{entry.entry_id}/ha-bt-advanced-panel.js",
+    # )
 
     return True
 
@@ -293,7 +296,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     # Unregister the panel
-    async_remove_panel(hass, f"ha-bt-advanced-{entry.entry_id}")
+    # Panel unregistration is temporarily disabled - needs update for HA 2025.12 API changes
+    # async_remove_panel(hass, f"ha-bt-advanced-{entry.entry_id}")
 
     # Remove the entry data
     if unload_ok:
