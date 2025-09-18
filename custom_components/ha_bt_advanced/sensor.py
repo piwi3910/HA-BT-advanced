@@ -18,13 +18,14 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
-    DOMAIN, 
-    ATTR_RSSI, 
-    ATTR_DISTANCE, 
+    DOMAIN,
+    ATTR_RSSI,
+    ATTR_DISTANCE,
     ATTR_GPS_ACCURACY,
     ATTR_ZONE,
     CONF_BEACON_CATEGORY,
     CATEGORY_ICONS,
+    DATA_MANAGER,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,7 +36,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensors for BLE Triangulation component."""
-    from .const import DATA_MANAGER
     manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
     
     @callback

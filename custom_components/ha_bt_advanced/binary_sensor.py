@@ -13,11 +13,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 import homeassistant.util.dt as dt_util
 
 from .const import (
-    DOMAIN, 
-    ATTR_LAST_SEEN, 
+    DOMAIN,
+    ATTR_LAST_SEEN,
     ATTR_ZONE,
     CONF_BEACON_CATEGORY,
     CATEGORY_ICONS,
+    DATA_MANAGER,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,7 +29,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up binary sensors for BLE Triangulation component."""
-    from .const import DATA_MANAGER
     manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
     
     # Add proxy connectivity sensors first

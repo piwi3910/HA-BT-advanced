@@ -19,6 +19,7 @@ from .const import (
     ATTR_GPS_ACCURACY,
     ATTR_LAST_SEEN,
     ATTR_SOURCE_PROXIES,
+    DATA_MANAGER,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,7 +30,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up device tracker for BLE Triangulation component."""
-    from .const import DATA_MANAGER
     manager = hass.data[DOMAIN][config_entry.entry_id][DATA_MANAGER]
     
     @callback
