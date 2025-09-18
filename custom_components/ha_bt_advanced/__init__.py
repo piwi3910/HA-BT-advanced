@@ -1,13 +1,10 @@
 """BLE Triangulation integration for Home Assistant."""
 import logging
-import os
-import shutil
 from pathlib import Path
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    CONF_DEVICE_ID,
     CONF_NAME,
     CONF_LATITUDE,
     CONF_LONGITUDE,
@@ -22,16 +19,10 @@ from homeassistant.components.http import StaticPathConfig
 
 from .const import (
     DOMAIN,
-    CONF_BEACONS,
-    CONF_PROXIES,
     CONF_PROXY_ID,
     CONF_MAC_ADDRESS,
     CONF_TX_POWER,
     CONF_PATH_LOSS_EXPONENT,
-    CONF_RSSI_SMOOTHING,
-    CONF_POSITION_SMOOTHING,
-    CONF_MAX_READING_AGE,
-    CONF_MIN_PROXIES,
     CONF_SERVICE_ENABLED,
     CONF_BEACON_CATEGORY,
     CONF_BEACON_ICON,
@@ -41,10 +32,6 @@ from .const import (
     CONF_ZONE_COORDINATES,
     DATA_CONFIG,
     DATA_MANAGER,
-    DEFAULT_TX_POWER,
-    DEFAULT_PATH_LOSS_EXPONENT,
-    DEFAULT_RSSI_SMOOTHING,
-    DEFAULT_POSITION_SMOOTHING,
     PROXY_CONFIG_DIR,
     BEACON_CONFIG_DIR,
     ZONE_CONFIG_DIR,
@@ -63,7 +50,6 @@ from .const import (
     BEACON_CATEGORY_OTHER,
 )
 from .manager import TriangulationManager
-import homeassistant.helpers.entity_component
 
 _LOGGER = logging.getLogger(__name__)
 

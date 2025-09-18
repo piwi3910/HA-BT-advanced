@@ -3,7 +3,7 @@
   "name": "HA-BT-Advanced",
   "codeowners": ["@piwi3910"],
   "config_flow": true,
-  "dependencies": ["mqtt", "http"],
+  "dependencies": ["mqtt", "http", "frontend"],
   "documentation": "https://github.com/piwi3910/HA-BT-advanced",
   "integration_type": "device",
   "iot_class": "local_push",

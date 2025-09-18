@@ -215,7 +215,8 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry):
         """Initialize options flow."""
-        # config_entry is automatically set by Home Assistant, no need to assign explicitly
+        # Store config_entry explicitly for use in async_step_init
+        self._config_entry = config_entry
         self.options = dict(config_entry.options)
         self.config_data = dict(config_entry.data)
 
@@ -243,7 +244,7 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
 
             # Update the config entry
             self.hass.config_entries.async_update_entry(
-                self.config_entry, data=updated_data
+                self._config_entry, data=updated_data
             )
             
             return self.async_create_entry(title="", data={})
