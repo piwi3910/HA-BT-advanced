@@ -34,3 +34,7 @@ ENV/
 
 # OS specific
 .DS_Store
+
+# Submodules (ignore content modifications)
+tools/cli
+tools/hacs-action
