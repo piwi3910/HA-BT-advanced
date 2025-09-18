@@ -266,7 +266,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Load the platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    
+
+    # Register the configuration panel
+    hass.http.register_static_path(
+        f"/ha_bt_advanced_panel/{entry.entry_id}",
+        Path(__file__).parent / "panel",
+        cache_headers=False,
+    )
+
+    await hass.components.frontend.async_register_web_panel(
+        component_name="custom",
+        sidebar_title="BT Advanced",
+        sidebar_icon="mdi:bluetooth",
+        frontend_url_path=f"ha-bt-advanced-{entry.entry_id}",
+        config={"entry_id": entry.entry_id},
+        module_url=f"/ha_bt_advanced_panel/{entry.entry_id}/ha-bt-advanced-panel.js",
+    )
+
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -282,6 +298,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Unload the platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    # Unregister the panel
+    hass.components.frontend.async_remove_web_panel(f"ha-bt-advanced-{entry.entry_id}")
 
     # Remove the entry data
     if unload_ok:

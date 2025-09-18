@@ -4,30 +4,19 @@ This integration provides Bluetooth Low Energy (BLE) beacon triangulation using 
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
 
-## ⚠️ Current Limitations
-
-**Important**: This integration currently requires manual configuration through YAML files and service calls. The visual map-based configuration mentioned in some documentation is not yet implemented. All proxy and beacon management must be done through:
-- YAML configuration files
-- Home Assistant service calls
-- Manual coordinate entry (latitude/longitude)
-
 ## Features
 
-### ✅ What Works
+### ✅ What's Included
+- 🗺️ **Visual Configuration Panel** - Interactive map-based interface for managing proxies, beacons, and zones
+- 📍 **Map-Based Proxy Placement** - Click on the map to place proxies or drag markers to adjust positions
+- 🔷 **Graphical Zone Drawing** - Draw custom zones directly on the map by clicking to define polygon boundaries
 - 📡 **MQTT Integration** - Receives BLE advertisement data from ESP32 proxies via MQTT
 - 📐 **Triangulation** - Calculates beacon positions using 2+ proxies (bilateration/multilateration)
-- 🗺️ **Device Tracking** - Creates device_tracker entities that appear on the Home Assistant map
+- 🎯 **Device Tracking** - Creates device_tracker entities that appear on the Home Assistant map
 - 📊 **Sensors** - RSSI signal strength, distance estimates, and accuracy metrics
 - 🏠 **Zone Detection** - Detects when beacons enter/leave defined zones
 - 🔔 **Notifications** - Alerts for new beacons, missing beacons, and offline proxies
-- 🎯 **Service Calls** - Add/remove beacons, proxies, and zones via services
-
-### ❌ Not Yet Implemented
-- Visual map-based configuration interface
-- Drag-and-drop proxy placement
-- Graphical zone drawing
-- Built-in ESPHome configuration generator
-- Configuration panel UI
+- 🛠️ **Service Calls** - Full API for automation and advanced configuration
 
 ## Installation
 
@@ -60,7 +49,14 @@ When adding the integration, you'll be prompted to configure:
   - Max Reading Age: 30 seconds
   - Min Proxies: 2
 
-### Step 2: Set Up ESP32 Proxies
+### Step 2: Access the Configuration Panel
+
+After installation, a new sidebar item "BT Advanced" will appear in your Home Assistant interface. Click it to open the visual configuration panel with:
+- Interactive map for proxy and zone management
+- Lists of configured proxies, beacons, and zones
+- Tools for adding and removing devices
+
+### Step 3: Set Up ESP32 Proxies
 
 1. **Flash ESP32 devices** with the provided ESPHome configuration:
 ```yaml
@@ -101,19 +97,31 @@ ble_tracker:
               return std::string(buffer);
 ```
 
-2. **Add proxies** using the service call:
-```yaml
-service: ha_bt_advanced.add_proxy
-data:
-  proxy_id: "ble-proxy-1"
-  latitude: 37.7749
-  longitude: -122.4194
-```
+2. **Add proxies** using the visual interface:
+   - Open the "BT Advanced" panel from the sidebar
+   - Click the "Add Proxy" button or select the proxy tool on the map
+   - Click on the map to place the proxy at the desired location
+   - Enter a unique proxy ID (e.g., "living_room_proxy")
+   - Save the proxy configuration
 
-### Step 3: Add Beacons
+   Alternatively, you can use the service call:
+   ```yaml
+   service: ha_bt_advanced.add_proxy
+   data:
+     proxy_id: "ble-proxy-1"
+     latitude: 37.7749
+     longitude: -122.4194
+   ```
 
-Beacons can be added manually via service call:
+### Step 4: Add Beacons
 
+Beacons can be added through the visual interface:
+- Click "Add Beacon" in the BT Advanced panel
+- Enter the beacon's MAC address and friendly name
+- Select a category (person, item, pet, vehicle, other)
+- Choose an icon for visual identification
+
+Or use the service call:
 ```yaml
 service: ha_bt_advanced.add_beacon
 data:
@@ -125,9 +133,16 @@ data:
   path_loss_exponent: 2.0
 ```
 
-### Step 4: Configure Zones (Optional)
+### Step 5: Configure Zones (Optional)
 
-Define zones for presence detection:
+Draw zones directly on the map:
+1. Click the "Draw Zone" button or select the zone tool
+2. Click multiple points on the map to define the zone boundary
+3. Complete the zone by clicking near the first point
+4. Enter zone name and type (room, home, work, custom)
+5. Save the zone
+
+Or define zones via service call:
 
 ```yaml
 service: ha_bt_advanced.add_zone
@@ -143,7 +158,26 @@ data:
   icon: "mdi:sofa"
 ```
 
-## Usage
+## Using the Visual Configuration Panel
+
+The BT Advanced panel provides an intuitive interface for managing your BLE tracking system:
+
+### Map Interface
+- **View Mode**: Pan and zoom the map to explore your setup
+- **Add Proxy Tool**: Click on the map to place new proxies
+- **Draw Zone Tool**: Click multiple points to create zone boundaries
+
+### Sidebar Controls
+- **Proxies Section**: View all proxies with online/offline status
+- **Beacons Section**: List of tracked beacons with current location
+- **Zones Section**: Configured zones with edit/delete options
+
+### Real-Time Updates
+- Beacon positions update automatically on the map
+- Proxy status indicators show connectivity
+- Zone presence is highlighted when beacons enter/leave
+
+## Managing Devices via Service Calls
 
 ### Managing Beacons
 
