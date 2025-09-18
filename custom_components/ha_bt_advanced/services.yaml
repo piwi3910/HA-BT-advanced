@@ -2,6 +2,10 @@ restart:
   name: Restart
   description: Restart the HA-BT-Advanced service.
 
+reload_integration:
+  name: Reload Integration
+  description: Reload the HA-BT-Advanced integration without restarting Home Assistant.
+
 add_beacon:
   name: Add Beacon
   description: Add a new BLE beacon to track.

@@ -91,9 +91,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def handle_restart(call: ServiceCall) -> None:
         """Handle the restart service call."""
         await manager.restart_service()
-    
+
     hass.services.async_register(
         DOMAIN, SERVICE_RESTART, handle_restart
+    )
+
+    async def handle_reload(call: ServiceCall) -> None:
+        """Handle the reload integration service call."""
+        _LOGGER.info("Reloading HA-BT-Advanced integration")
+        await hass.config_entries.async_reload(entry.entry_id)
+
+    hass.services.async_register(
+        DOMAIN, "reload_integration", handle_reload
     )
     
     async def handle_add_beacon(call: ServiceCall) -> None:
