@@ -268,10 +268,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register the configuration panel
-    hass.http.register_static_path(
-        f"/ha_bt_advanced_panel/{entry.entry_id}",
-        Path(__file__).parent / "panel",
-        cache_headers=False,
+    hass.http.async_register_static_paths(
+        [
+            (
+                f"/ha_bt_advanced_panel/{entry.entry_id}",
+                str(Path(__file__).parent / "panel"),
+                False,
+            )
+        ]
     )
 
     await hass.components.frontend.async_register_web_panel(
