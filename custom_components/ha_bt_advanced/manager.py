@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import yaml
 from homeassistant.components import mqtt
+from homeassistant.components.persistent_notification import async_create as async_create_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_NAME,
@@ -580,7 +581,8 @@ class TriangulationManager:
                 
                 # Create notification for new beacon
                 notification_id = NOTIFICATION_NEW_BEACON.format(mac)
-                self.hass.components.persistent_notification.create(
+                async_create_notification(
+                    self.hass,
                     f"A new beacon with MAC address {mac} has been discovered. "
                     f"You can configure it in the HA-BT-Advanced panel.",
                     title="New BLE Beacon Discovered",
@@ -763,7 +765,8 @@ class TriangulationManager:
                 if notification_id not in self._proxy_offline_notifications:
                     self._proxy_offline_notifications[notification_id] = True
                     
-                    self.hass.components.persistent_notification.create(
+                    async_create_notification(
+                        self.hass,
                         f"Proxy {proxy_id} has not been seen for more than "
                         f"{self.max_reading_age * 2} seconds and is considered offline.",
                         title="BLE Proxy Offline",
@@ -795,7 +798,8 @@ class TriangulationManager:
                 if notification_id not in self._beacon_missing_notifications:
                     self._beacon_missing_notifications[notification_id] = True
                     
-                    self.hass.components.persistent_notification.create(
+                    async_create_notification(
+                        self.hass,
                         f"Beacon {name} ({mac}) has not been seen for more than "
                         f"{self.max_reading_age * 3} seconds and may be out of range or powered off.",
                         title="BLE Beacon Missing",

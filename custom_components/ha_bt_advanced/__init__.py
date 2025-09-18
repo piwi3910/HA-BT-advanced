@@ -17,6 +17,8 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, ServiceCall
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.components.frontend import async_register_web_panel, async_remove_panel
+from homeassistant.components.http import StaticPathConfig
 
 from .const import (
     DOMAIN,
@@ -270,7 +272,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register the configuration panel
     hass.http.async_register_static_paths(
         [
-            (
+            StaticPathConfig(
                 f"/ha_bt_advanced_panel/{entry.entry_id}",
                 str(Path(__file__).parent / "panel"),
                 False,
@@ -278,7 +280,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ]
     )
 
-    await hass.components.frontend.async_register_web_panel(
+    await async_register_web_panel(
+        hass,
         component_name="custom",
         sidebar_title="BT Advanced",
         sidebar_icon="mdi:bluetooth",
@@ -304,7 +307,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     # Unregister the panel
-    hass.components.frontend.async_remove_web_panel(f"ha-bt-advanced-{entry.entry_id}")
+    async_remove_panel(hass, f"ha-bt-advanced-{entry.entry_id}")
 
     # Remove the entry data
     if unload_ok:
