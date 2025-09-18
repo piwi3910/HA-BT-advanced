@@ -11,8 +11,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_NAME,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-    LENGTH_METERS,
     PERCENTAGE,
+    UnitOfLength,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -158,7 +158,7 @@ class BLEDistanceSensor(SensorEntity):
         # Initialize state
         self._distance = None
         self._proxy_id = None
-        self._attr_native_unit_of_measurement = LENGTH_METERS
+        self._attr_native_unit_of_measurement = UnitOfLength.METERS
         self._attr_device_class = SensorDeviceClass.DISTANCE
         self._attr_state_class = SensorStateClass.MEASUREMENT
         
@@ -228,7 +228,7 @@ class BLEAccuracySensor(SensorEntity):
         
         # Initialize state
         self._accuracy = None
-        self._attr_native_unit_of_measurement = LENGTH_METERS
+        self._attr_native_unit_of_measurement = UnitOfLength.METERS
         self._attr_state_class = SensorStateClass.MEASUREMENT
         
         # Register for updates
