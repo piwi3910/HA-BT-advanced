@@ -268,7 +268,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     # Register the panel using the correct API (following HACS pattern)
-    await frontend.async_register_built_in_panel(
+    # Note: async_register_built_in_panel is not a coroutine, don't await it
+    frontend.async_register_built_in_panel(
         hass,
         component_name="custom",
         sidebar_title="BT Advanced",

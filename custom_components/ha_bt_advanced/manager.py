@@ -166,7 +166,8 @@ class TriangulationManager:
         beacon_dir = Path(self.hass.config.path(BEACON_CONFIG_DIR))
 
         if not beacon_dir.exists():
-            await self.hass.async_add_executor_job(beacon_dir.mkdir, True, True)
+            if not beacon_dir.exists():
+            await self.hass.async_add_executor_job(lambda: beacon_dir.mkdir(parents=True, exist_ok=True))
             return beacons
 
         file_paths = await self.hass.async_add_executor_job(
@@ -191,7 +192,8 @@ class TriangulationManager:
         proxy_dir = Path(self.hass.config.path(PROXY_CONFIG_DIR))
 
         if not proxy_dir.exists():
-            await self.hass.async_add_executor_job(proxy_dir.mkdir, True, True)
+            if not proxy_dir.exists():
+            await self.hass.async_add_executor_job(lambda: proxy_dir.mkdir(parents=True, exist_ok=True))
             return proxies
 
         file_paths = await self.hass.async_add_executor_job(
@@ -287,7 +289,8 @@ class TriangulationManager:
         
         # Save to file
         beacon_dir = Path(self.hass.config.path(BEACON_CONFIG_DIR))
-        await self.hass.async_add_executor_job(beacon_dir.mkdir, True, True)
+        if not beacon_dir.exists():
+            await self.hass.async_add_executor_job(lambda: beacon_dir.mkdir(parents=True, exist_ok=True))
         
         beacon_file = beacon_dir / f"{mac}.yaml"
         content = yaml.dump(beacon_config)
@@ -419,7 +422,8 @@ class TriangulationManager:
         
         # Save to file
         proxy_dir = Path(self.hass.config.path(PROXY_CONFIG_DIR))
-        await self.hass.async_add_executor_job(proxy_dir.mkdir, True, True)
+        if not proxy_dir.exists():
+            await self.hass.async_add_executor_job(lambda: proxy_dir.mkdir(parents=True, exist_ok=True))
         
         proxy_file = proxy_dir / f"{proxy_id}.yaml"
         content = yaml.dump(proxy_config)
