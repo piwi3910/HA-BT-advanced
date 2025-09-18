@@ -29,12 +29,23 @@
           "menu_option": "Select Option"
         }
       },
+      "menu": {
+        "title": "HA-BT-Advanced Configuration",
+        "description": "Select a configuration option",
+        "menu_options": {
+          "beacons": "Manage Beacons",
+          "proxies": "Manage Proxies",
+          "signal": "Signal Parameters",
+          "calibration": "Calibration"
+        }
+      },
       "beacons": {
         "title": "Manage Beacons",
-        "description": "Currently tracking {beacon_count} beacon(s)\n\n{beacon_list}",
+        "description": "{info}",
         "data": {
           "add_beacon": "Add new beacon (start discovery)",
-          "beacon_to_delete": "Select beacon to delete",
+          "beacon_to_remove": "Select beacon to remove",
+          "remove_beacon": "Remove selected beacon",
           "back_to_menu": "Back to menu"
         }
       },
@@ -46,9 +57,17 @@
         }
       },
       "proxies": {
-        "title": "BLE Proxies",
-        "description": "Detected {proxy_count} proxy(ies)\n\n{proxy_list}\n\n{info}",
-        "data": {}
+        "title": "Manage Proxies",
+        "description": "{info}",
+        "data": {
+          "new_proxy_id": "Proxy ID",
+          "new_proxy_lat": "Latitude",
+          "new_proxy_lng": "Longitude",
+          "add_proxy": "Add new proxy",
+          "proxy_to_remove": "Select proxy to remove",
+          "remove_proxy": "Remove selected proxy",
+          "back_to_menu": "Back to menu"
+        }
       },
       "calibration": {
         "title": "Proxy Calibration",
@@ -89,7 +108,7 @@
         "title": "Discovery in Progress",
         "description": "{info}",
         "data": {
-          "check_results": "Check results now",
+          "refresh": "Refresh",
           "stop_discovery": "Stop discovery"
         }
       },
@@ -97,18 +116,46 @@
         "title": "Discovered Beacons",
         "description": "{info}",
         "data": {
-          "beacon_to_onboard": "Select beacon"
+          "beacons_to_onboard": "Select beacons to onboard",
+          "back_to_beacons": "Back to beacons"
+        }
+      },
+      "onboard_multiple": {
+        "title": "Quick Onboard Multiple Beacons",
+        "description": "{info}",
+        "data": {
+          "name_prefix": "Name prefix",
+          "category": "Beacon category"
         }
       },
       "onboard_beacon": {
         "title": "Onboard Beacon",
-        "description": "Configure beacon {beacon_mac}",
+        "description": "{info}",
         "data": {
           "name": "Friendly name",
           "category": "Beacon category",
           "icon": "Icon (e.g., mdi:key)",
           "notifications": "Enable notifications",
           "precision": "Tracking precision"
+        }
+      },
+      "onboard_success": {
+        "title": "Beacon Onboarding Complete",
+        "description": "{info}",
+        "data": {
+          "back_to_beacons": "Back to beacons"
+        }
+      },
+      "signal": {
+        "title": "Signal Parameters",
+        "description": "{info}",
+        "data": {
+          "tx_power": "TX Power at 1m (dBm)",
+          "path_loss_exponent": "Path Loss Exponent",
+          "rssi_smoothing": "RSSI Smoothing Factor",
+          "position_smoothing": "Position Smoothing Factor",
+          "max_reading_age": "Max Reading Age (seconds)",
+          "min_proxies": "Minimum Proxies"
         }
       },
       "signal_parameters": {
@@ -126,7 +173,15 @@
     },
     "error": {
       "no_beacons_found": "No beacons discovered",
-      "onboarding_failed": "Failed to onboard beacon"
+      "onboard_failed": "Failed to onboard beacon",
+      "remove_failed": "Failed to remove item",
+      "add_failed": "Failed to add item",
+      "missing_data": "Missing required data",
+      "discovery_failed": "Failed to start discovery",
+      "calibration_failed": "Failed to start calibration",
+      "no_proxies": "No proxies available",
+      "no_results": "No calibration results available",
+      "unknown": "Unknown error occurred"
     }
   },
   "entity": {
