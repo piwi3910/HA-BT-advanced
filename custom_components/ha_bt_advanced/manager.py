@@ -602,14 +602,28 @@ class TriangulationManager:
                     # Don't process beacon normally during calibration
                     return
 
-            # Extract beacon data for type detection
+            # Extract beacon data including Eddystone telemetry
             beacon_data = {
+                # iBeacon data
                 'uuid': payload.get('uuid'),
                 'major': payload.get('major'),
                 'minor': payload.get('minor'),
                 'tx_power': payload.get('tx_power'),
                 'manufacturer_id': payload.get('manufacturer_id'),
                 'service_uuids': payload.get('service_uuids', []),
+                # Eddystone data
+                'eddystone_uid': payload.get('eddystone_uid'),
+                'eddystone_url': payload.get('eddystone_url'),
+                'eddystone_namespace': payload.get('eddystone_namespace'),
+                'eddystone_instance': payload.get('eddystone_instance'),
+                # Eddystone telemetry (TLM frame)
+                'battery_voltage': payload.get('battery_voltage'),
+                'temperature': payload.get('temperature'),
+                'packet_count': payload.get('packet_count'),
+                'uptime_seconds': payload.get('uptime_seconds'),
+                # Generic telemetry
+                'battery_level': payload.get('battery_level'),
+                'frame_type': payload.get('frame_type'),
             }
 
             # Check if beacon should be processed
@@ -672,9 +686,9 @@ class TriangulationManager:
                     category=category,
                 )
                 
-            # Update readings in tracker
+            # Update readings in tracker with beacon data
             tracker = self._trackers[mac]
-            tracker.update_reading(proxy_id, rssi, timestamp)
+            tracker.update_reading(proxy_id, rssi, timestamp, beacon_data)
             
             # Get proxy positions for triangulation
             proxy_positions = {

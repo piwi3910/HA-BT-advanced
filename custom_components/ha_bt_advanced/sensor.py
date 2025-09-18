@@ -13,6 +13,7 @@ from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     PERCENTAGE,
     UnitOfLength,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -51,6 +52,8 @@ async def async_setup_entry(
             BLEDistanceSensor(hass, manager, beacon_id, beacon_name, icon),
             BLEAccuracySensor(hass, manager, beacon_id, beacon_name, icon),
             BLEZoneSensor(hass, manager, beacon_id, beacon_name, icon),
+            BLEBatterySensor(hass, manager, beacon_id, beacon_name),
+            BLETemperatureSensor(hass, manager, beacon_id, beacon_name),
         ]
         async_add_entities(entities)
     
@@ -366,5 +369,219 @@ class BLEZoneSensor(SensorEntity):
                     self._zone_name = f"Unknown Zone ({self._zone_id})"
             else:
                 self._zone_name = "Not in a zone"
-                
+
             self.async_write_ha_state()
+
+
+class BLEBatterySensor(SensorEntity):
+    """Battery sensor for BLE beacon."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        manager,
+        beacon_id: str,
+        beacon_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        self.hass = hass
+        self._manager = manager
+        self._beacon_id = beacon_id
+        self._name = f"{beacon_name} Battery"
+        self._unique_id = f"beacon_{beacon_id.lower().replace(':', '_')}_battery"
+        self._state = None
+        self._voltage = None
+
+        # Register for updates
+        manager.register_update_callback(self._unique_id, self._async_update)
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return self._unique_id
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information about this entity."""
+        return {
+            "identifiers": {(DOMAIN, f"beacon_{self._beacon_id.lower().replace(':', '_')}")},
+            "name": self._name.replace(" Battery", ""),
+            "manufacturer": "iBeacon",
+            "model": "BLE Beacon",
+        }
+
+    @property
+    def native_value(self) -> Optional[float]:
+        """Return the state of the sensor."""
+        return self._state
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the unit of measurement."""
+        return PERCENTAGE
+
+    @property
+    def device_class(self) -> str:
+        """Return the device class."""
+        return SensorDeviceClass.BATTERY
+
+    @property
+    def state_class(self) -> str:
+        """Return the state class."""
+        return SensorStateClass.MEASUREMENT
+
+    @property
+    def icon(self) -> str:
+        """Return the icon."""
+        if self._state is not None:
+            if self._state > 80:
+                return "mdi:battery"
+            elif self._state > 60:
+                return "mdi:battery-80"
+            elif self._state > 40:
+                return "mdi:battery-60"
+            elif self._state > 20:
+                return "mdi:battery-40"
+            elif self._state > 10:
+                return "mdi:battery-20"
+            else:
+                return "mdi:battery-alert"
+        return "mdi:battery-unknown"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {}
+        if self._voltage is not None:
+            attrs["voltage"] = f"{self._voltage:.2f}V"
+
+        # Get telemetry from tracker
+        if self._beacon_id in self._manager._trackers:
+            tracker = self._manager._trackers[self._beacon_id]
+            if tracker.telemetry.get('packet_count'):
+                attrs["packet_count"] = tracker.telemetry['packet_count']
+            if tracker.telemetry.get('uptime_seconds'):
+                uptime = tracker.telemetry['uptime_seconds']
+                # Convert to human-readable format
+                days = uptime // 86400
+                hours = (uptime % 86400) // 3600
+                minutes = (uptime % 3600) // 60
+                attrs["uptime"] = f"{days}d {hours}h {minutes}m"
+
+        return attrs
+
+    @callback
+    def _async_update(self, data: Dict[str, Any]) -> None:
+        """Update the sensor state."""
+        # Get telemetry from tracker
+        if self._beacon_id in self._manager._trackers:
+            tracker = self._manager._trackers[self._beacon_id]
+            if tracker.telemetry:
+                self._state = tracker.telemetry.get('battery_level')
+                self._voltage = tracker.telemetry.get('battery_voltage')
+
+        # Update the entity state
+        self.async_write_ha_state()
+
+
+class BLETemperatureSensor(SensorEntity):
+    """Temperature sensor for BLE beacon."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        manager,
+        beacon_id: str,
+        beacon_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        self.hass = hass
+        self._manager = manager
+        self._beacon_id = beacon_id
+        self._name = f"{beacon_name} Temperature"
+        self._unique_id = f"beacon_{beacon_id.lower().replace(':', '_')}_temperature"
+        self._state = None
+
+        # Register for updates
+        manager.register_update_callback(self._unique_id, self._async_update)
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return self._unique_id
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information about this entity."""
+        return {
+            "identifiers": {(DOMAIN, f"beacon_{self._beacon_id.lower().replace(':', '_')}")},
+            "name": self._name.replace(" Temperature", ""),
+            "manufacturer": "iBeacon",
+            "model": "BLE Beacon",
+        }
+
+    @property
+    def native_value(self) -> Optional[float]:
+        """Return the state of the sensor."""
+        return self._state
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the unit of measurement."""
+        return UnitOfTemperature.CELSIUS
+
+    @property
+    def device_class(self) -> str:
+        """Return the device class."""
+        return SensorDeviceClass.TEMPERATURE
+
+    @property
+    def state_class(self) -> str:
+        """Return the state class."""
+        return SensorStateClass.MEASUREMENT
+
+    @property
+    def icon(self) -> str:
+        """Return the icon."""
+        return "mdi:thermometer"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional attributes."""
+        attrs = {}
+
+        # Get telemetry from tracker
+        if self._beacon_id in self._manager._trackers:
+            tracker = self._manager._trackers[self._beacon_id]
+            if tracker.telemetry.get('frame_types_seen'):
+                attrs["frame_types"] = list(tracker.telemetry['frame_types_seen'])
+
+        return attrs
+
+    @callback
+    def _async_update(self, data: Dict[str, Any]) -> None:
+        """Update the sensor state."""
+        # Get telemetry from tracker
+        if self._beacon_id in self._manager._trackers:
+            tracker = self._manager._trackers[self._beacon_id]
+            if tracker.telemetry:
+                temp = tracker.telemetry.get('temperature')
+                if temp is not None:
+                    # Convert from fixed point if needed
+                    if temp > 100:  # Likely in 8.8 fixed point format
+                        self._state = temp / 256.0
+                    else:
+                        self._state = temp
+
+        # Update the entity state
+        self.async_write_ha_state()

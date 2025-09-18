@@ -81,15 +81,88 @@ class BeaconTracker:
         self.zone = None
         self.prev_zone = None
 
-    def update_reading(self, proxy_id: str, rssi: int, timestamp: float):
+        # Telemetry data (from Eddystone TLM frames)
+        self.telemetry = {
+            'battery_voltage': None,
+            'battery_level': None,
+            'temperature': None,
+            'packet_count': None,
+            'uptime_seconds': None,
+            'last_telemetry_update': None,
+            # Store different frame types we've seen
+            'frame_types_seen': set(),
+            # iBeacon specific
+            'uuid': None,
+            'major': None,
+            'minor': None,
+            # Eddystone UID
+            'eddystone_namespace': None,
+            'eddystone_instance': None,
+            # Eddystone URL
+            'eddystone_url': None,
+        }
+
+    def update_telemetry(self, beacon_data: Dict[str, Any], timestamp: float):
+        """Update telemetry data from beacon advertisement."""
+        # Update battery data
+        if beacon_data.get('battery_voltage') is not None:
+            self.telemetry['battery_voltage'] = beacon_data['battery_voltage']
+            # Convert voltage to percentage (assuming 3.0V = 100%, 2.0V = 0%)
+            voltage = beacon_data['battery_voltage']
+            if isinstance(voltage, (int, float)) and voltage > 0:
+                # Convert mV to V if needed
+                if voltage > 100:  # Likely in mV
+                    voltage = voltage / 1000.0
+                battery_pct = min(100, max(0, (voltage - 2.0) / (3.0 - 2.0) * 100))
+                self.telemetry['battery_level'] = round(battery_pct)
+
+        if beacon_data.get('battery_level') is not None:
+            self.telemetry['battery_level'] = beacon_data['battery_level']
+
+        if beacon_data.get('temperature') is not None:
+            self.telemetry['temperature'] = beacon_data['temperature']
+
+        if beacon_data.get('packet_count') is not None:
+            self.telemetry['packet_count'] = beacon_data['packet_count']
+
+        if beacon_data.get('uptime_seconds') is not None:
+            self.telemetry['uptime_seconds'] = beacon_data['uptime_seconds']
+
+        # Update iBeacon data
+        if beacon_data.get('uuid'):
+            self.telemetry['uuid'] = beacon_data['uuid']
+        if beacon_data.get('major') is not None:
+            self.telemetry['major'] = beacon_data['major']
+        if beacon_data.get('minor') is not None:
+            self.telemetry['minor'] = beacon_data['minor']
+
+        # Update Eddystone data
+        if beacon_data.get('eddystone_namespace'):
+            self.telemetry['eddystone_namespace'] = beacon_data['eddystone_namespace']
+        if beacon_data.get('eddystone_instance'):
+            self.telemetry['eddystone_instance'] = beacon_data['eddystone_instance']
+        if beacon_data.get('eddystone_url'):
+            self.telemetry['eddystone_url'] = beacon_data['eddystone_url']
+
+        # Track frame types
+        if beacon_data.get('frame_type'):
+            self.telemetry['frame_types_seen'].add(beacon_data['frame_type'])
+
+        self.telemetry['last_telemetry_update'] = timestamp
+
+    def update_reading(self, proxy_id: str, rssi: int, timestamp: float, beacon_data: Dict[str, Any] = None):
         """Update RSSI reading for a specific proxy."""
         if proxy_id not in self.proxy_readings:
             self.proxy_readings[proxy_id] = RSSIBuffer(
                 max_age=self.max_reading_age,
                 smoothing_factor=self.rssi_smoothing,
             )
-        
+
         self.proxy_readings[proxy_id].add_reading(rssi, timestamp)
+
+        # Update telemetry if beacon data provided
+        if beacon_data:
+            self.update_telemetry(beacon_data, timestamp)
 
     def clean_old_readings(self):
         """Remove old readings from all proxy buffers."""
