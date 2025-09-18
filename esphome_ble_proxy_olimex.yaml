@@ -25,6 +25,7 @@ api:
 
 # Add MQTT for BLE triangulation
 mqtt:
+  id: mqtt_client
   broker: !secret mqtt_broker
   username: !secret mqtt_username
   password: !secret mqtt_password
@@ -32,58 +33,167 @@ mqtt:
   topic_prefix: "${name}"
   on_connect:
     - logger.log: "MQTT Connected!"
-    - mqtt.publish:
-        topic: "${mqtt_topic_prefix}/status/${proxy_id}"
-        payload: "online"
+    - mqtt.publish_json:
+        topic: "${mqtt_topic_prefix}/proxy/${proxy_id}/status"
+        payload: |-
+          root["status"] = "online";
+          root["proxy_id"] = "${proxy_id}";
+          root["hardware"] = "Olimex ESP32-POE-ISO";
+          root["board"] = "ESP32";
   on_disconnect:
     - logger.log: "MQTT Disconnected!"
-
-# Script to publish BLE iBeacon data
-script:
-  - id: publish_ibeacon
-    mode: queued
-    parameters:
-      mac: string
-      rssi: int
-      uuid: string
-      major: int
-      minor: int
-      tx_power: int
-    then:
-      - mqtt.publish_json:
-          topic: "${mqtt_topic_prefix}/${proxy_id}"
-          payload: |-
-            root["proxy_id"] = "${proxy_id}";
-            root["beacon_mac"] = mac;
-            root["rssi"] = rssi;
-            root["uuid"] = uuid;
-            root["major"] = major;
-            root["minor"] = minor;
-            root["tx_power"] = tx_power;
+    - mqtt.publish_json:
+        topic: "${mqtt_topic_prefix}/proxy/${proxy_id}/status"
+        payload: |-
+          root["status"] = "offline";
+          root["proxy_id"] = "${proxy_id}";
 
 # Process BLE advertisements for triangulation
 esp32_ble_tracker:
   on_ble_advertise:
     - then:
         - lambda: |-
+            // Get MAC address and RSSI (common to all beacon types)
+            std::string mac_address = x.address_str();
+            int rssi = x.get_rssi();
+
+            // Start building JSON payload with common fields
+            std::string payload = "{";
+            payload += "\"proxy_id\":\"${proxy_id}\",";
+            payload += "\"beacon_mac\":\"" + mac_address + "\",";
+            payload += "\"rssi\":" + std::to_string(rssi);
+
+            // Process iBeacon advertisements
             if (x.get_ibeacon().has_value()) {
               auto ibeacon = x.get_ibeacon().value();
 
-              // Get MAC address as string
-              std::string mac_str = x.address_str();
+              payload += ",\"frame_type\":\"ibeacon\"";
+              payload += ",\"uuid\":\"" + ibeacon.get_uuid().to_string() + "\"";
+              payload += ",\"major\":" + std::to_string(ibeacon.get_major());
+              payload += ",\"minor\":" + std::to_string(ibeacon.get_minor());
+              payload += ",\"tx_power\":" + std::to_string(ibeacon.get_signal_power());
 
-              // Publish via script
-              id(publish_ibeacon).execute(
-                mac_str,
-                x.get_rssi(),
-                ibeacon.get_uuid().to_string(),
-                ibeacon.get_major(),
-                ibeacon.get_minor(),
-                ibeacon.get_signal_power()
-              );
+              payload += "}";
+              id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+              ESP_LOGD("ble_tracker", "Published iBeacon: %s", payload.c_str());
             }
 
-# Text sensor for proxy identification
+            // Process Eddystone advertisements (check independently from iBeacon)
+            if (x.get_service_data_uuid() == esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
+              // Eddystone uses service UUID 0xFEAA
+              auto data = x.get_service_data();
+
+              if (data.size() > 0) {
+                uint8_t frame_type = data[0];
+
+                // Eddystone-UID (0x00)
+                if (frame_type == 0x00 && data.size() >= 20) {
+                  payload += ",\"frame_type\":\"eddystone-uid\"";
+                  payload += ",\"tx_power\":" + std::to_string((int8_t)data[1]);
+
+                  // Extract namespace (10 bytes)
+                  char namespace_hex[21];
+                  sprintf(namespace_hex, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+                    data[2], data[3], data[4], data[5], data[6],
+                    data[7], data[8], data[9], data[10], data[11]);
+                  payload += ",\"eddystone_namespace\":\"" + std::string(namespace_hex) + "\"";
+
+                  // Extract instance (6 bytes)
+                  char instance_hex[13];
+                  sprintf(instance_hex, "%02x%02x%02x%02x%02x%02x",
+                    data[12], data[13], data[14], data[15], data[16], data[17]);
+                  payload += ",\"eddystone_instance\":\"" + std::string(instance_hex) + "\"";
+
+                  payload += "}";
+                  id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+                  ESP_LOGD("ble_tracker", "Published Eddystone-UID: %s", payload.c_str());
+                }
+                // Eddystone-TLM (0x20) - Telemetry data
+                else if (frame_type == 0x20 && data.size() >= 14) {
+                  payload += ",\"frame_type\":\"eddystone-tlm\"";
+
+                  // TLM version
+                  uint8_t tlm_version = data[1];
+                  payload += ",\"tlm_version\":" + std::to_string(tlm_version);
+
+                  if (tlm_version == 0x00) {  // Unencrypted TLM
+                    // Battery voltage in mV (2 bytes, big endian)
+                    uint16_t battery_mv = (data[2] << 8) | data[3];
+                    payload += ",\"battery_voltage\":" + std::to_string(battery_mv);
+
+                    // Temperature in 8.8 fixed point format (2 bytes, big endian)
+                    int16_t temp_raw = (data[4] << 8) | data[5];
+                    float temperature = temp_raw / 256.0;
+                    payload += ",\"temperature\":" + std::to_string(temperature);
+
+                    // Advertising PDU count (4 bytes, big endian)
+                    uint32_t pdu_count = (data[6] << 24) | (data[7] << 16) | (data[8] << 8) | data[9];
+                    payload += ",\"packet_count\":" + std::to_string(pdu_count);
+
+                    // Time since power-on in 0.1 second units (4 bytes, big endian)
+                    uint32_t time_units = (data[10] << 24) | (data[11] << 16) | (data[12] << 8) | data[13];
+                    uint32_t uptime_seconds = time_units / 10;
+                    payload += ",\"uptime_seconds\":" + std::to_string(uptime_seconds);
+                  }
+
+                  payload += "}";
+                  id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+                  ESP_LOGD("ble_tracker", "Published Eddystone-TLM: %s", payload.c_str());
+                }
+                // Eddystone-URL (0x10)
+                else if (frame_type == 0x10 && data.size() >= 3) {
+                  payload += ",\"frame_type\":\"eddystone-url\"";
+                  payload += ",\"tx_power\":" + std::to_string((int8_t)data[1]);
+
+                  // URL scheme prefix
+                  const char* url_schemes[] = {"http://www.", "https://www.", "http://", "https://"};
+                  uint8_t scheme = data[2];
+                  std::string url = "";
+
+                  if (scheme < 4) {
+                    url = url_schemes[scheme];
+                  }
+
+                  // Decode URL
+                  for (size_t i = 3; i < data.size(); i++) {
+                    uint8_t byte = data[i];
+                    if (byte < 14) {
+                      // Special expansion codes
+                      const char* expansions[] = {
+                        ".com/", ".org/", ".edu/", ".net/", ".info/", ".biz/",
+                        ".gov/", ".com", ".org", ".edu", ".net", ".info", ".biz", ".gov"
+                      };
+                      url += expansions[byte];
+                    } else if (byte >= 32 && byte <= 126) {
+                      // Printable ASCII
+                      url += (char)byte;
+                    }
+                  }
+
+                  payload += ",\"eddystone_url\":\"" + url + "\"";
+                  payload += "}";
+                  id(mqtt_client).publish("${mqtt_topic_prefix}/${proxy_id}", payload);
+                  ESP_LOGD("ble_tracker", "Published Eddystone-URL: %s", payload.c_str());
+                }
+              }
+            }
+
+            // Log unhandled advertisement types for debugging
+            // Note: A beacon may send multiple frame types (iBeacon, Eddystone, etc.)
+            // so we only log if NONE of the above matched
+            if (!x.get_ibeacon().has_value() &&
+                x.get_service_data_uuid() != esp32_ble_tracker::ESPBTUUID::from_uint16(0xFEAA)) {
+              ESP_LOGV("ble_tracker", "Unhandled advertisement type from %s", mac_address.c_str());
+            }
+
+# Sensors to monitor system health
+sensor:
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+    id: uptime_sensor
+    update_interval: 60s
+
+# Text sensor for proxy identification and network info
 text_sensor:
   - platform: template
     name: "${friendly_name} Proxy ID"
@@ -92,3 +202,39 @@ text_sensor:
     update_interval: never
     icon: "mdi:identifier"
     entity_category: diagnostic
+
+  - platform: ethernet_info
+    ip_address:
+      name: "${friendly_name} IP Address"
+      id: ip_address
+
+# Binary sensor for connection status
+binary_sensor:
+  - platform: status
+    name: "${friendly_name} Status"
+
+# Periodic status update
+interval:
+  - interval: 60s
+    then:
+      - mqtt.publish_json:
+          topic: "${mqtt_topic_prefix}/proxy/${proxy_id}/status"
+          payload: |-
+            root["status"] = "online";
+            root["proxy_id"] = "${proxy_id}";
+            root["hardware"] = "Olimex ESP32-POE-ISO";
+            root["board"] = "ESP32";
+            root["connection_type"] = "Ethernet";
+
+            // Network info if available
+            if (id(ip_address).has_state()) {
+              root["ip_address"] = id(ip_address).state;
+            }
+
+            // System info
+            if (id(uptime_sensor).has_state()) {
+              root["uptime"] = id(uptime_sensor).state;
+            }
+      - logger.log:
+          format: "Published proxy status heartbeat"
+          level: DEBUG

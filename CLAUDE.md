@@ -28,7 +28,18 @@ This project implements a BLE iBeacon triangulation system with ESPHome Bluetoot
   - `esphome_wizard.py`: ESPHome configuration generator
 - `README.md`: Project documentation
 
-## Development Commands
+## Development Environment Note
+
+**IMPORTANT**: Claude Code's development environment is NOT on the same host as Home Assistant or ESPHome. Do not attempt to run local commands for:
+- ESPHome compilation or deployment (`esphome run`, `esphome config`)
+- Home Assistant CLI commands (`ha core restart`)
+- Direct Docker operations
+- Python service execution
+- MQTT broker commands (mosquitto_sub, mosquitto_pub)
+
+Instead, provide instructions for users to run these commands on their Home Assistant host.
+
+## Development Commands (For Users to Run on Their HA Host)
 
 ### Python Triangulation Service
 
