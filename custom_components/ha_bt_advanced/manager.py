@@ -77,6 +77,7 @@ from .const import (
 )
 from .triangulation import BeaconTracker, Triangulator
 from .zones import ZoneManager
+from .discovery import DiscoveryManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -112,10 +113,13 @@ class TriangulationManager:
         
         # Initialize zone manager
         self.zone_manager = ZoneManager(hass)
-        
+
+        # Initialize discovery manager
+        self.discovery_manager = DiscoveryManager(hass)
+
         # Initialize the triangulator
         self.triangulator = Triangulator()
-        
+
         # Initialize beacon trackers
         self._trackers = {}
         self._initialize_trackers()
@@ -180,6 +184,8 @@ class TriangulationManager:
                 if beacon_config and isinstance(beacon_config, dict):
                     mac = file_path.stem.upper()
                     beacons[mac] = beacon_config
+                    # Add to onboarded list in discovery manager
+                    self.discovery_manager.add_onboarded_beacon(mac)
             except Exception as e:
                 _LOGGER.error(f"Error loading beacon config from {file_path}: {e}")
 
@@ -296,7 +302,10 @@ class TriangulationManager:
             
         # Add to in-memory config
         self.beacons[mac] = beacon_config
-        
+
+        # Mark beacon as onboarded
+        self.discovery_manager.add_onboarded_beacon(mac)
+
         # Create tracker if it doesn't exist
         if mac not in self._trackers:
             # Use beacon-specific signal parameters if provided
@@ -365,6 +374,9 @@ class TriangulationManager:
         # Remove from in-memory config
         if mac in self.beacons:
             del self.beacons[mac]
+
+        # Remove from onboarded list
+        self.discovery_manager.remove_onboarded_beacon(mac)
             
         # Remove tracker
         if mac in self._trackers:
@@ -549,10 +561,27 @@ class TriangulationManager:
                 
             beacon_mac = payload.get(ATTR_BEACON_MAC)
             rssi = payload.get(ATTR_RSSI)
-            
+
             if not beacon_mac or rssi is None:
                 return
-                
+
+            # Extract beacon data for type detection
+            beacon_data = {
+                'uuid': payload.get('uuid'),
+                'major': payload.get('major'),
+                'minor': payload.get('minor'),
+                'tx_power': payload.get('tx_power'),
+                'manufacturer_id': payload.get('manufacturer_id'),
+                'service_uuids': payload.get('service_uuids', []),
+            }
+
+            # Check if beacon should be processed
+            if not self.discovery_manager.should_process_beacon(beacon_mac, rssi, beacon_data):
+                # If in discovery mode, add to discovered beacons
+                if self.discovery_manager.discovery_mode:
+                    self.discovery_manager.process_discovery_beacon(beacon_mac, rssi, beacon_data, proxy_id)
+                return
+
             # Parse timestamp or use current time
             ts_str = payload.get(ATTR_TIMESTAMP)
             if ts_str:
@@ -917,6 +946,9 @@ class TriangulationManager:
         self.beacons = await self._async_load_beacons()
         self.proxies = await self._async_load_proxies()
 
+        # Load virtual users
+        await self.discovery_manager.load_virtual_users()
+
         # Subscribe to MQTT
         await self._subscribe_mqtt()
         
@@ -930,6 +962,138 @@ class TriangulationManager:
                 self._proxy_last_seen[proxy_id] = 0
                 
         _LOGGER.info("HA-BT-Advanced triangulation service started")
+
+    async def start_discovery(self, duration: int = 60) -> None:
+        """Start beacon discovery mode."""
+        await self.discovery_manager.start_discovery(duration)
+        _LOGGER.info(f"Discovery mode started for {duration} seconds")
+
+    def stop_discovery(self) -> None:
+        """Stop beacon discovery mode."""
+        self.discovery_manager._stop_discovery()
+        _LOGGER.info("Discovery mode stopped")
+
+    def get_discovered_beacons(self) -> List[Dict[str, Any]]:
+        """Get list of discovered beacons."""
+        return self.discovery_manager.get_discovered_beacons()
+
+    async def onboard_beacon(
+        self,
+        mac_address: str,
+        name: str,
+        owner: Optional[str] = None,
+        category: str = BEACON_CATEGORY_ITEM,
+        icon: Optional[str] = None,
+        notifications_enabled: bool = True,
+        tracking_precision: str = "medium",
+    ) -> bool:
+        """Onboard a discovered beacon."""
+        # Validate MAC address
+        if not self._validate_mac_address(mac_address):
+            _LOGGER.error(f"Invalid MAC address: {mac_address}")
+            return False
+
+        mac = self._format_mac_address(mac_address)
+
+        # Get beacon data from discovered beacons
+        discovered_info = self.discovery_manager.discovered_beacons.get(mac, {})
+        beacon_data = discovered_info.get('beacon_data', {})
+
+        # Build beacon configuration
+        beacon_config = {
+            'name': name,
+            'mac': mac,
+            'owner': owner,
+            'category': category,
+            'icon': icon or CATEGORY_ICONS.get(category),
+            'beacon_type': discovered_info.get('beacon_type', 'unknown'),
+            'beacon_data': beacon_data,
+            'onboarded_at': datetime.now().isoformat(),
+            'notifications': {
+                'enabled': notifications_enabled,
+                'on_arrive': True,
+                'on_leave': True,
+                'on_not_seen_for': 1800,  # 30 minutes
+            },
+            'tracking': {
+                'enabled': True,
+                'precision': tracking_precision,
+            },
+        }
+
+        # Save beacon configuration
+        beacon_dir = Path(self.hass.config.path(BEACON_CONFIG_DIR))
+        if not beacon_dir.exists():
+            await self.hass.async_add_executor_job(lambda: beacon_dir.mkdir(parents=True, exist_ok=True))
+
+        beacon_file = beacon_dir / f"{mac}.yaml"
+        content = yaml.dump(beacon_config)
+        await self.hass.async_add_executor_job(beacon_file.write_text, content)
+
+        # Add to in-memory config
+        self.beacons[mac] = beacon_config
+
+        # Mark beacon as onboarded
+        self.discovery_manager.add_onboarded_beacon(mac)
+
+        # Create tracker for the beacon
+        if mac not in self._trackers:
+            self._trackers[mac] = BeaconTracker(
+                mac=mac,
+                name=name,
+                rssi_smoothing_factor=self.rssi_smoothing,
+                position_smoothing_factor=self.position_smoothing,
+                max_reading_age=self.max_reading_age,
+                tx_power=self.tx_power,
+                path_loss_exponent=self.path_loss_exponent,
+            )
+
+        # Register beacon with callbacks
+        for callback in self._beacon_callbacks:
+            callback(mac, name)
+
+        _LOGGER.info(f"Successfully onboarded beacon {name} ({mac})")
+        return True
+
+    async def onboard_multiple_beacons(
+        self,
+        beacons: List[Dict[str, Any]],
+        default_owner: Optional[str] = None,
+        default_category: str = BEACON_CATEGORY_ITEM,
+        notifications_enabled: bool = True,
+    ) -> Dict[str, bool]:
+        """Onboard multiple beacons at once."""
+        results = {}
+        for beacon in beacons:
+            mac = beacon.get('mac')
+            name = beacon.get('name', f"Beacon {mac[-6:]}")
+            owner = beacon.get('owner', default_owner)
+            category = beacon.get('category', default_category)
+            icon = beacon.get('icon')
+
+            success = await self.onboard_beacon(
+                mac_address=mac,
+                name=name,
+                owner=owner,
+                category=category,
+                icon=icon,
+                notifications_enabled=notifications_enabled,
+            )
+            results[mac] = success
+
+        return results
+
+    async def create_virtual_user(self, name: str) -> str:
+        """Create a virtual user for guests."""
+        return await self.discovery_manager.create_virtual_user(name)
+
+    def get_all_users(self) -> List[Dict[str, str]]:
+        """Get all available users (HA users + virtual users)."""
+        return self.discovery_manager.get_all_users()
+
+    def set_discovery_filters(self, filters: Dict[str, Any]) -> None:
+        """Set filters for beacon discovery."""
+        self.discovery_manager.set_beacon_filters(filters)
 
     async def stop(self) -> None:
         """Stop the triangulation service."""

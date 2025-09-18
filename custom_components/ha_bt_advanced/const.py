@@ -79,6 +79,12 @@ SERVICE_REMOVE_PROXY = "remove_proxy"
 SERVICE_ADD_ZONE = "add_zone"
 SERVICE_REMOVE_ZONE = "remove_zone"
 SERVICE_CALIBRATE = "calibrate"
+SERVICE_START_DISCOVERY = "start_discovery"
+SERVICE_STOP_DISCOVERY = "stop_discovery"
+SERVICE_ONBOARD_BEACON = "onboard_beacon"
+SERVICE_ONBOARD_MULTIPLE = "onboard_multiple_beacons"
+SERVICE_CREATE_VIRTUAL_USER = "create_virtual_user"
+SERVICE_SET_DISCOVERY_FILTERS = "set_discovery_filters"
 
 # Signal attributes
 ATTR_RSSI = "rssi"

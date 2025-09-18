@@ -44,6 +44,12 @@ from .const import (
     SERVICE_ADD_ZONE,
     SERVICE_REMOVE_ZONE,
     SERVICE_CALIBRATE,
+    SERVICE_START_DISCOVERY,
+    SERVICE_STOP_DISCOVERY,
+    SERVICE_ONBOARD_BEACON,
+    SERVICE_ONBOARD_MULTIPLE,
+    SERVICE_CREATE_VIRTUAL_USER,
+    SERVICE_SET_DISCOVERY_FILTERS,
     BEACON_CATEGORY_PERSON,
     BEACON_CATEGORY_ITEM,
     BEACON_CATEGORY_PET,
@@ -243,6 +249,102 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             vol.Required(CONF_MAC_ADDRESS): cv.string,
             vol.Optional(CONF_TX_POWER): vol.Coerce(float),
             vol.Optional(CONF_PATH_LOSS_EXPONENT): vol.Coerce(float),
+        })
+    )
+
+    # Discovery and onboarding services
+    async def handle_start_discovery(call: ServiceCall) -> None:
+        """Handle the start_discovery service call."""
+        duration = call.data.get("duration", 60)
+        await manager.start_discovery(duration)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_START_DISCOVERY,
+        handle_start_discovery,
+        schema=vol.Schema({
+            vol.Optional("duration", default=60): vol.Coerce(int),
+        })
+    )
+
+    async def handle_stop_discovery(call: ServiceCall) -> None:
+        """Handle the stop_discovery service call."""
+        manager.stop_discovery()
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_STOP_DISCOVERY,
+        handle_stop_discovery
+    )
+
+    async def handle_onboard_beacon(call: ServiceCall) -> None:
+        """Handle the onboard_beacon service call."""
+        success = await manager.onboard_beacon(
+            mac_address=call.data.get(CONF_MAC_ADDRESS),
+            name=call.data.get(CONF_NAME),
+            owner=call.data.get("owner"),
+            category=call.data.get(CONF_BEACON_CATEGORY, BEACON_CATEGORY_ITEM),
+            icon=call.data.get(CONF_BEACON_ICON),
+            notifications_enabled=call.data.get("notifications_enabled", True),
+            tracking_precision=call.data.get("tracking_precision", "medium"),
+        )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ONBOARD_BEACON,
+        handle_onboard_beacon,
+        schema=vol.Schema({
+            vol.Required(CONF_MAC_ADDRESS): cv.string,
+            vol.Required(CONF_NAME): cv.string,
+            vol.Optional("owner"): cv.string,
+            vol.Optional(CONF_BEACON_CATEGORY): vol.In([
+                BEACON_CATEGORY_PERSON,
+                BEACON_CATEGORY_ITEM,
+                BEACON_CATEGORY_PET,
+                BEACON_CATEGORY_VEHICLE,
+                BEACON_CATEGORY_OTHER,
+            ]),
+            vol.Optional(CONF_BEACON_ICON): cv.string,
+            vol.Optional("notifications_enabled", default=True): cv.boolean,
+            vol.Optional("tracking_precision", default="medium"): vol.In(["low", "medium", "high"]),
+        })
+    )
+
+    async def handle_create_virtual_user(call: ServiceCall) -> None:
+        """Handle the create_virtual_user service call."""
+        user_id = await manager.create_virtual_user(call.data.get("name"))
+        _LOGGER.info(f"Created virtual user: {user_id}")
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CREATE_VIRTUAL_USER,
+        handle_create_virtual_user,
+        schema=vol.Schema({
+            vol.Required("name"): cv.string,
+        })
+    )
+
+    async def handle_set_discovery_filters(call: ServiceCall) -> None:
+        """Handle the set_discovery_filters service call."""
+        filters = {
+            "include_uuids": call.data.get("include_uuids", []),
+            "exclude_uuids": call.data.get("exclude_uuids", []),
+            "min_rssi": call.data.get("min_rssi", -70),
+            "min_proxy_count": call.data.get("min_proxy_count", 1),
+            "min_detection_count": call.data.get("min_detection_count", 3),
+        }
+        manager.set_discovery_filters(filters)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_DISCOVERY_FILTERS,
+        handle_set_discovery_filters,
+        schema=vol.Schema({
+            vol.Optional("include_uuids"): vol.All(cv.ensure_list, [cv.string]),
+            vol.Optional("exclude_uuids"): vol.All(cv.ensure_list, [cv.string]),
+            vol.Optional("min_rssi", default=-70): vol.Coerce(int),
+            vol.Optional("min_proxy_count", default=1): vol.Coerce(int),
+            vol.Optional("min_detection_count", default=3): vol.Coerce(int),
         })
     )
 

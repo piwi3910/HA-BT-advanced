@@ -200,3 +200,152 @@ calibrate:
           min: 1.0
           max: 4.0
           step: 0.1
+
+start_discovery:
+  name: Start Discovery
+  description: Start beacon discovery mode to find new beacons nearby.
+  fields:
+    duration:
+      name: Duration
+      description: How long discovery mode should run (in seconds).
+      required: false
+      default: 60
+      example: 60
+      selector:
+        number:
+          min: 10
+          max: 300
+          step: 10
+          unit_of_measurement: seconds
+
+stop_discovery:
+  name: Stop Discovery
+  description: Stop beacon discovery mode.
+
+onboard_beacon:
+  name: Onboard Beacon
+  description: Onboard a discovered beacon to start tracking it.
+  fields:
+    mac_address:
+      name: MAC Address
+      description: The MAC address of the beacon to onboard.
+      required: true
+      example: "AA:BB:CC:DD:EE:FF"
+      selector:
+        text:
+    name:
+      name: Name
+      description: Friendly name for the beacon.
+      required: true
+      example: "John's Keys"
+      selector:
+        text:
+    owner:
+      name: Owner
+      description: User ID or virtual user ID who owns this beacon.
+      required: false
+      example: "john"
+      selector:
+        text:
+    beacon_category:
+      name: Category
+      description: Category of the beacon.
+      required: false
+      default: "item"
+      selector:
+        select:
+          options:
+            - person
+            - item
+            - pet
+            - vehicle
+            - other
+    beacon_icon:
+      name: Icon
+      description: Icon for the beacon.
+      required: false
+      example: "mdi:key"
+      selector:
+        icon:
+    notifications_enabled:
+      name: Enable Notifications
+      description: Whether to enable notifications for this beacon.
+      required: false
+      default: true
+      selector:
+        boolean:
+    tracking_precision:
+      name: Tracking Precision
+      description: How precise the tracking should be.
+      required: false
+      default: "medium"
+      selector:
+        select:
+          options:
+            - low
+            - medium
+            - high
+
+create_virtual_user:
+  name: Create Virtual User
+  description: Create a virtual user for guest beacon tracking.
+  fields:
+    name:
+      name: Name
+      description: Name of the virtual user.
+      required: true
+      example: "John (Guest)"
+      selector:
+        text:
+
+set_discovery_filters:
+  name: Set Discovery Filters
+  description: Configure filters for beacon discovery.
+  fields:
+    include_uuids:
+      name: Include UUIDs
+      description: Only discover beacons with these UUIDs.
+      required: false
+      example: ["550e8400-e29b-41d4-a716-446655440000"]
+      selector:
+        text:
+          multiple: true
+    exclude_uuids:
+      name: Exclude UUIDs
+      description: Ignore beacons with these UUIDs.
+      required: false
+      example: ["f7826da6-4fa2-4e98-8024-bc5b71e0893e"]
+      selector:
+        text:
+          multiple: true
+    min_rssi:
+      name: Minimum RSSI
+      description: Minimum signal strength to consider (dBm).
+      required: false
+      default: -70
+      selector:
+        number:
+          min: -100
+          max: -30
+          step: 5
+          unit_of_measurement: dBm
+    min_proxy_count:
+      name: Minimum Proxy Count
+      description: Minimum number of proxies that must see the beacon.
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+    min_detection_count:
+      name: Minimum Detection Count
+      description: Minimum number of times beacon must be detected.
+      required: false
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 20
+          step: 1
