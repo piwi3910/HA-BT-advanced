@@ -131,6 +131,10 @@ class TriangulationManager:
         self._proxy_last_seen = {}
         self._beacon_last_seen = {}
         self._proxy_offline_notifications = {}
+
+        # Calibration data
+        self._calibration_mode = {}  # proxy_id -> {start_time, reference_distance, duration, rssi_samples}
+        self._calibration_results = {}  # proxy_id -> {tx_power, path_loss_exponent, avg_rssi, std_dev}
         self._beacon_missing_notifications = {}
         
         # Schedule periodic cleanup and status check
@@ -584,6 +588,19 @@ class TriangulationManager:
 
             if not beacon_mac or rssi is None:
                 return
+
+            # Check if this proxy is in calibration mode
+            if self.is_proxy_calibrating(proxy_id):
+                calibration_data = self._calibration_mode.get(proxy_id)
+                if calibration_data:
+                    # Collect RSSI samples for calibration
+                    calibration_data["rssi_samples"].append(rssi)
+                    _LOGGER.debug(
+                        f"Calibration sample for {proxy_id}: RSSI={rssi} dBm "
+                        f"(sample #{len(calibration_data['rssi_samples'])})"
+                    )
+                    # Don't process beacon normally during calibration
+                    return
 
             # Extract beacon data for type detection
             beacon_data = {
@@ -1173,4 +1190,154 @@ class TriangulationManager:
             f"Calibrated beacon {beacon_config.get(CONF_NAME, mac)} ({mac}): "
             f"tx_power={tx_power}, path_loss_exponent={path_loss_exponent}"
         )
+        return True
+
+    async def start_proxy_calibration(
+        self,
+        proxy_id: str,
+        reference_distance: float = 1.0,
+        duration: int = 30
+    ) -> bool:
+        """Start calibration mode for a proxy."""
+        if proxy_id not in self.proxies:
+            _LOGGER.error(f"Proxy {proxy_id} not found")
+            return False
+
+        # Initialize calibration data
+        self._calibration_mode[proxy_id] = {
+            "start_time": time.time(),
+            "reference_distance": reference_distance,
+            "duration": duration,
+            "rssi_samples": []
+        }
+
+        _LOGGER.info(
+            f"Started calibration for proxy {proxy_id}. "
+            f"Place beacon at {reference_distance}m from the proxy. "
+            f"Collecting RSSI samples for {duration} seconds."
+        )
+
+        # Create notification for user
+        await async_create_notification(
+            self.hass,
+            title="Proxy Calibration Started",
+            message=(
+                f"Calibration started for proxy {proxy_id}.\n\n"
+                f"1. Place a beacon exactly {reference_distance} meters from the proxy\n"
+                f"2. Keep the beacon stationary during calibration\n"
+                f"3. Ensure clear line of sight between beacon and proxy\n"
+                f"4. Wait {duration} seconds for calibration to complete\n\n"
+                f"Call the 'get_calibration_results' service when complete."
+            ),
+            notification_id=f"proxy_calibration_{proxy_id}"
+        )
+
+        # Schedule calibration completion
+        async def complete_calibration():
+            await asyncio.sleep(duration)
+            await self._complete_proxy_calibration(proxy_id)
+
+        self.hass.async_create_task(complete_calibration())
+        return True
+
+    async def _complete_proxy_calibration(self, proxy_id: str) -> None:
+        """Complete proxy calibration and calculate results."""
+        if proxy_id not in self._calibration_mode:
+            return
+
+        calibration_data = self._calibration_mode[proxy_id]
+        rssi_samples = calibration_data["rssi_samples"]
+
+        if len(rssi_samples) < 5:
+            _LOGGER.warning(
+                f"Insufficient RSSI samples for proxy {proxy_id}: {len(rssi_samples)}. "
+                "Need at least 5 samples for reliable calibration."
+            )
+            # Notify user of failure
+            await async_create_notification(
+                self.hass,
+                title="Calibration Failed",
+                message=(
+                    f"Calibration failed for proxy {proxy_id}.\n"
+                    f"Only received {len(rssi_samples)} RSSI samples (minimum 5 required).\n"
+                    "Please ensure the beacon is transmitting and try again."
+                ),
+                notification_id=f"proxy_calibration_{proxy_id}"
+            )
+            del self._calibration_mode[proxy_id]
+            return
+
+        # Calculate statistics
+        import statistics
+        avg_rssi = statistics.mean(rssi_samples)
+        std_dev = statistics.stdev(rssi_samples) if len(rssi_samples) > 1 else 0
+
+        # Calculate TX power at 1m using the reference distance
+        # RSSI = TX_Power - 10 * n * log10(distance)
+        # TX_Power = RSSI + 10 * n * log10(distance)
+        reference_distance = calibration_data["reference_distance"]
+
+        # Use current path loss exponent or default
+        n = self.path_loss_exponent
+
+        # Calculate TX power at 1m
+        import math
+        tx_power_at_1m = avg_rssi + 10 * n * math.log10(reference_distance)
+
+        # Store results
+        self._calibration_results[proxy_id] = {
+            "tx_power": round(tx_power_at_1m, 1),
+            "path_loss_exponent": n,
+            "avg_rssi": round(avg_rssi, 1),
+            "std_dev": round(std_dev, 2),
+            "sample_count": len(rssi_samples),
+            "reference_distance": reference_distance,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+        # Remove from calibration mode
+        del self._calibration_mode[proxy_id]
+
+        # Notify user of completion
+        await async_create_notification(
+            self.hass,
+            title="Calibration Complete",
+            message=(
+                f"Calibration completed for proxy {proxy_id}.\n\n"
+                f"Results:\n"
+                f"• Average RSSI: {round(avg_rssi, 1)} dBm\n"
+                f"• Standard Deviation: {round(std_dev, 2)} dBm\n"
+                f"• Calculated TX Power at 1m: {round(tx_power_at_1m, 1)} dBm\n"
+                f"• Samples collected: {len(rssi_samples)}\n\n"
+                f"Call 'get_calibration_results' service for detailed results."
+            ),
+            notification_id=f"proxy_calibration_{proxy_id}"
+        )
+
+        _LOGGER.info(
+            f"Calibration complete for proxy {proxy_id}: "
+            f"TX Power={round(tx_power_at_1m, 1)} dBm, "
+            f"Avg RSSI={round(avg_rssi, 1)} dBm, "
+            f"Std Dev={round(std_dev, 2)} dBm"
+        )
+
+    def get_calibration_results(self, proxy_id: str) -> Optional[Dict[str, Any]]:
+        """Get calibration results for a proxy."""
+        return self._calibration_results.get(proxy_id)
+
+    def is_proxy_calibrating(self, proxy_id: str) -> bool:
+        """Check if a proxy is currently in calibration mode."""
+        if proxy_id not in self._calibration_mode:
+            return False
+
+        calibration_data = self._calibration_mode[proxy_id]
+        elapsed = time.time() - calibration_data["start_time"]
+
+        # Check if calibration is still active
+        if elapsed > calibration_data["duration"]:
+            # Calibration should have completed, clean up if needed
+            if proxy_id in self._calibration_mode:
+                del self._calibration_mode[proxy_id]
+            return False
+
         return True

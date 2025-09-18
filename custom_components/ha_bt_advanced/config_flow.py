@@ -214,7 +214,8 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry):
         """Initialize options flow."""
-        self.config_entry = config_entry
+        # Don't store config_entry directly (deprecated in HA 2025.12)
+        self._entry_id = config_entry.entry_id
         self.options = dict(config_entry.options)
         self.config_data = dict(config_entry.data)
         self._discovered_beacons = []
@@ -264,10 +265,10 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_init()
 
         # Get current beacons from manager
-        manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get("manager")
+        manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get("manager")
         if not manager:
             # Try alternate key
-            manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get(DATA_MANAGER)
+            manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
 
         beacons = []
         beacon_options = {}
@@ -317,9 +318,9 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             if user_input.get("confirm"):
                 # Delete the beacon
-                manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get("manager")
+                manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get("manager")
                 if not manager:
-                    manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get(DATA_MANAGER)
+                    manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
                 if manager:
                     await manager.remove_beacon(self._beacon_to_delete)
 
@@ -340,9 +341,9 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
         errors = {}
 
         # Get detected proxies from manager
-        manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get("manager")
+        manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get("manager")
         if not manager:
-            manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get(DATA_MANAGER)
+            manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
         proxies = []
 
         if manager and hasattr(manager, 'proxies'):
@@ -373,9 +374,9 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             if user_input.get("start_discovery"):
                 # Start discovery mode
-                manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get("manager")
+                manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get("manager")
                 if not manager:
-                    manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get(DATA_MANAGER)
+                    manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
                 if manager:
                     await manager.start_discovery(60)
                     return await self.async_step_discovered_beacons()
@@ -401,9 +402,9 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
         """Show discovered beacons for onboarding."""
         errors = {}
 
-        manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get("manager")
+        manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get("manager")
         if not manager:
-            manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get(DATA_MANAGER)
+            manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
 
         if user_input is not None:
             if user_input.get("beacon_to_onboard"):
@@ -450,9 +451,9 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             # Onboard the beacon
-            manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get("manager")
+            manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get("manager")
         if not manager:
-            manager = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {}).get(DATA_MANAGER)
+            manager = self.hass.data.get(DOMAIN, {}).get(self._entry_id, {}).get(DATA_MANAGER)
             if manager:
                 success = await manager.onboard_beacon(
                     mac_address=self._selected_beacon,
@@ -511,8 +512,9 @@ class HABTAdvancedOptionsFlow(config_entries.OptionsFlow):
             updated_data[CONF_SIGNAL_PARAMETERS] = updated_signal_params
 
             # Update the config entry
+            config_entry = self.hass.config_entries.async_get_entry(self._entry_id)
             self.hass.config_entries.async_update_entry(
-                self.config_entry, data=updated_data
+                config_entry, data=updated_data
             )
 
             return self.async_create_entry(title="", data={})

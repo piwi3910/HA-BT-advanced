@@ -14,6 +14,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, ServiceCall
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.components.persistent_notification import async_create as async_create_notification
 
 from .const import (
     DOMAIN,
@@ -119,20 +120,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if any(entry.entry_id in device.config_entries for entry in [entry])
         ]
 
-        # Get list of onboarded beacon MACs
-        onboarded_macs = set(manager.beacons.keys()) if manager else set()
+        # Get list of onboarded beacon MACs (normalized to lowercase)
+        onboarded_macs = set(mac.lower() for mac in manager.beacons.keys()) if manager else set()
+        _LOGGER.debug(f"Onboarded beacons: {onboarded_macs}")
 
         removed_count = 0
         for device in devices:
             # Check if this is a beacon device
             for identifier in device.identifiers:
                 if len(identifier) == 2 and identifier[0] == DOMAIN:
-                    device_mac = identifier[1].upper()
-                    # If it's a beacon MAC and not onboarded, remove it
-                    if ":" in device_mac and device_mac not in onboarded_macs:
-                        _LOGGER.info(f"Removing non-onboarded beacon device: {device_mac}")
-                        device_registry.async_remove_device(device.id)
-                        removed_count += 1
+                    device_id = identifier[1]
+                    _LOGGER.debug(f"Checking device identifier: {device_id}")
+
+                    # Check if it's a beacon device (starts with "beacon_")
+                    if device_id.startswith("beacon_"):
+                        # Extract MAC from the unique_id format: beacon_xx_xx_xx_xx_xx_xx
+                        mac_part = device_id.replace("beacon_", "")
+                        # Convert underscore format back to colon format
+                        mac_address = mac_part.replace("_", ":").lower()
+
+                        # If it's not onboarded, remove it
+                        if mac_address not in onboarded_macs:
+                            _LOGGER.info(f"Removing non-onboarded beacon device: {device_id} (MAC: {mac_address})")
+                            device_registry.async_remove_device(device.id)
+                            removed_count += 1
+                        else:
+                            _LOGGER.debug(f"Keeping onboarded beacon: {device_id} (MAC: {mac_address})")
 
         _LOGGER.info(f"Cleanup complete. Removed {removed_count} non-onboarded beacon devices")
 
@@ -389,9 +402,83 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         })
     )
 
+    # Calibration services
+    async def handle_calibrate_proxy(call: ServiceCall) -> None:
+        """Handle the calibrate_proxy service call."""
+        proxy_id = call.data.get(CONF_PROXY_ID)
+        reference_distance = call.data.get("reference_distance", 1.0)
+        duration = call.data.get("duration", 30)
+
+        success = await manager.start_proxy_calibration(
+            proxy_id=proxy_id,
+            reference_distance=reference_distance,
+            duration=duration
+        )
+
+        if not success:
+            _LOGGER.error(f"Failed to start calibration for proxy {proxy_id}")
+
+    hass.services.async_register(
+        DOMAIN,
+        "calibrate_proxy",
+        handle_calibrate_proxy,
+        schema=vol.Schema({
+            vol.Required(CONF_PROXY_ID): cv.string,
+            vol.Optional("reference_distance", default=1.0): vol.Range(min=0.5, max=10.0),
+            vol.Optional("duration", default=30): vol.Range(min=10, max=120),
+        })
+    )
+
+    async def handle_get_calibration_results(call: ServiceCall) -> None:
+        """Handle the get_calibration_results service call."""
+        proxy_id = call.data.get(CONF_PROXY_ID)
+
+        results = manager.get_calibration_results(proxy_id)
+
+        if results:
+            # Create notification with results
+            await async_create_notification(
+                hass,
+                title=f"Calibration Results for {proxy_id}",
+                message=(
+                    f"**Calibration Results**\n\n"
+                    f"• TX Power at 1m: {results['tx_power']} dBm\n"
+                    f"• Path Loss Exponent: {results['path_loss_exponent']}\n"
+                    f"• Average RSSI: {results['avg_rssi']} dBm\n"
+                    f"• Standard Deviation: {results['std_dev']} dBm\n"
+                    f"• Samples Collected: {results['sample_count']}\n"
+                    f"• Reference Distance: {results['reference_distance']} m\n"
+                    f"• Timestamp: {results['timestamp']}\n\n"
+                    f"**Recommended Settings:**\n"
+                    f"• TX Power: {results['tx_power']} dBm\n"
+                    f"• Path Loss Exponent: 2.5-3.0 for indoor environments"
+                ),
+                notification_id=f"calibration_results_{proxy_id}"
+            )
+
+            # Also fire an event with the results
+            hass.bus.async_fire(
+                f"{DOMAIN}_calibration_complete",
+                {
+                    "proxy_id": proxy_id,
+                    "results": results
+                }
+            )
+        else:
+            _LOGGER.warning(f"No calibration results available for proxy {proxy_id}")
+
+    hass.services.async_register(
+        DOMAIN,
+        "get_calibration_results",
+        handle_get_calibration_results,
+        schema=vol.Schema({
+            vol.Required(CONF_PROXY_ID): cv.string,
+        })
+    )
+
     # ESPHome configuration is now handled via example YAML files
     # See the README.md and esphome_ble_proxy.yaml for more information
-    
+
     # Start the manager
     if entry.data.get(CONF_SERVICE_ENABLED, True):
         await manager.start()

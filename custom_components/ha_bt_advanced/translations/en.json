@@ -59,12 +59,9 @@
       },
       "discovered_beacons": {
         "title": "Discovered Beacons",
-        "description": "Found {beacon_count} new beacon(s). Select one to onboard:",
+        "description": "{info}",
         "data": {
           "beacon_to_onboard": "Select beacon"
-        },
-        "data_description": {
-          "info": "{info}"
         }
       },
       "onboard_beacon": {

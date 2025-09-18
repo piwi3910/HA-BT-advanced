@@ -357,3 +357,49 @@ set_discovery_filters:
           min: 1
           max: 20
           step: 1
+
+calibrate_proxy:
+  name: Calibrate Proxy
+  description: Start calibration mode for a specific proxy to determine optimal signal parameters.
+  fields:
+    proxy_id:
+      name: Proxy ID
+      description: The ID of the proxy to calibrate.
+      required: true
+      example: "living_room_proxy"
+      selector:
+        text:
+    reference_distance:
+      name: Reference Distance
+      description: Distance in meters between the beacon and proxy during calibration.
+      required: true
+      default: 1.0
+      selector:
+        number:
+          min: 0.5
+          max: 10.0
+          step: 0.5
+          unit_of_measurement: m
+    duration:
+      name: Duration
+      description: How long to collect RSSI samples (in seconds).
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 10
+          max: 120
+          step: 5
+          unit_of_measurement: seconds
+
+get_calibration_results:
+  name: Get Calibration Results
+  description: Retrieve calibration results after calibration is complete.
+  fields:
+    proxy_id:
+      name: Proxy ID
+      description: The ID of the proxy to get calibration results for.
+      required: true
+      example: "living_room_proxy"
+      selector:
+        text:
