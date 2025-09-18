@@ -60,14 +60,12 @@ esp32_ble_tracker:
             if (x.get_ibeacon().has_value()) {
               auto ibeacon = x.get_ibeacon().value();
 
-              char mac_str[18];
-              sprintf(mac_str, "%02X:%02X:%02X:%02X:%02X:%02X",
-                      x.address[0], x.address[1], x.address[2],
-                      x.address[3], x.address[4], x.address[5]);
+              // Get MAC address as string
+              std::string mac_str = x.address_str();
 
               // Publish via script
               id(publish_ibeacon).execute(
-                std::string(mac_str),
+                mac_str,
                 x.get_rssi(),
                 ibeacon.get_uuid().to_string(),
                 ibeacon.get_major(),
